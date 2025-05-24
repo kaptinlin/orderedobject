@@ -1,8 +1,10 @@
 package orderedobject
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	json "github.com/go-json-experiment/json"
 )
@@ -78,15 +80,10 @@ func TestMarshal(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc // capture
 		t.Run(tc.name, func(t *testing.T) {
 			encoded, err := json.Marshal(tc.object) // Use v2 Marshal
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got := string(encoded); got != tc.expected {
-				t.Errorf("want %s, got %s", tc.expected, got)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, string(encoded))
 		})
 	}
 }
@@ -134,12 +131,8 @@ func TestGet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotValue, gotFound := obj.Get(tt.key)
-			if gotFound != tt.wantFound {
-				t.Errorf("Get() found = %v, want %v", gotFound, tt.wantFound)
-			}
-			if gotValue != tt.wantValue {
-				t.Errorf("Get() value = %v, want %v", gotValue, tt.wantValue)
-			}
+			assert.Equal(t, tt.wantFound, gotFound)
+			assert.Equal(t, tt.wantValue, gotValue)
 		})
 	}
 }
@@ -150,13 +143,8 @@ func TestHas(t *testing.T) {
 	obj := NewObject[any](2)
 	obj.Set("key", "value")
 
-	if !obj.Has("key") {
-		t.Error("Has() = false, want true")
-	}
-
-	if obj.Has("missing") {
-		t.Error("Has() = true, want false")
-	}
+	assert.True(t, obj.Has("key"))
+	assert.False(t, obj.Has("missing"))
 }
 
 func TestDelete(t *testing.T) {
@@ -171,21 +159,16 @@ func TestDelete(t *testing.T) {
 	obj.Delete("b")
 
 	expectedJSON := `{"a":1,"c":3}`
-	encoded, _ := json.Marshal(obj)
-	if string(encoded) != expectedJSON {
-		t.Errorf("After Delete() JSON = %s, want %s", encoded, expectedJSON)
-	}
+	encoded, err := json.Marshal(obj)
+	require.NoError(t, err)
+	assert.Equal(t, expectedJSON, string(encoded))
 
 	// Check key no longer exists
-	if obj.Has("b") {
-		t.Error("Key 'b' should have been deleted")
-	}
+	assert.False(t, obj.Has("b"))
 
 	// Delete non-existent key shouldn't affect object
 	obj.Delete("missing")
-	if obj.Length() != 2 {
-		t.Errorf("Length after deleting non-existent key = %d, want %d", obj.Length(), 2)
-	}
+	assert.Equal(t, 2, obj.Length())
 }
 
 func TestForEach(t *testing.T) {
@@ -204,44 +187,35 @@ func TestForEach(t *testing.T) {
 		valueSum += value.(int)
 	})
 
-	if keySum != "abc" {
-		t.Errorf("ForEach() key sum = %s, want %s", keySum, "abc")
-	}
-
-	if valueSum != 6 {
-		t.Errorf("ForEach() value sum = %d, want %d", valueSum, 6)
-	}
+	assert.Equal(t, "abc", keySum)
+	assert.Equal(t, 6, valueSum)
 
 	// Verify values through Get
-	if got, found := obj.Get("a"); !found || got != 1 {
-		t.Errorf("Value for 'a' = %v (found: %v), want %v", got, found, 1)
-	}
-	if got, found := obj.Get("b"); !found || got != 2 {
-		t.Errorf("Value for 'b' = %v (found: %v), want %v", got, found, 2)
-	}
-	if got, found := obj.Get("c"); !found || got != 3 {
-		t.Errorf("Value for 'c' = %v (found: %v), want %v", got, found, 3)
-	}
+	value, found := obj.Get("a")
+	assert.True(t, found)
+	assert.Equal(t, 1, value)
+
+	value, found = obj.Get("b")
+	assert.True(t, found)
+	assert.Equal(t, 2, value)
+
+	value, found = obj.Get("c")
+	assert.True(t, found)
+	assert.Equal(t, 3, value)
 }
 
 func TestLength(t *testing.T) {
 	t.Parallel()
 
 	obj := NewObject[any](0)
-	if obj.Length() != 0 {
-		t.Errorf("Length() = %d, want 0", obj.Length())
-	}
+	assert.Equal(t, 0, obj.Length())
 
 	obj.Set("a", 1)
 	obj.Set("b", 2)
-	if obj.Length() != 2 {
-		t.Errorf("Length() = %d, want 2", obj.Length())
-	}
+	assert.Equal(t, 2, obj.Length())
 
 	obj.Delete("a")
-	if obj.Length() != 1 {
-		t.Errorf("Length() = %d, want 1", obj.Length())
-	}
+	assert.Equal(t, 1, obj.Length())
 }
 
 func TestChaining(t *testing.T) {
@@ -253,18 +227,14 @@ func TestChaining(t *testing.T) {
 		Set("b", 2).
 		Set("c", 3)
 
-	if obj.Length() != 3 {
-		t.Errorf("Chaining length = %d, want %d", obj.Length(), 3)
-	}
+	assert.Equal(t, 3, obj.Length())
 
 	sum := 0
 	obj.ForEach(func(key string, value any) {
 		sum += value.(int)
 	})
 
-	if sum != 6 {
-		t.Errorf("Chaining sum = %d, want %d", sum, 6)
-	}
+	assert.Equal(t, 6, sum)
 }
 
 func TestFromMap(t *testing.T) {
@@ -280,18 +250,14 @@ func TestFromMap(t *testing.T) {
 
 	// Check all key-value pairs exist
 	for k, v := range m {
-		if !obj.Has(k) {
-			t.Errorf("Key %s not found in object", k)
-		}
-		if got, found := obj.Get(k); !found || got != v {
-			t.Errorf("Value for key %s = %v (found: %v), want %v", k, got, found, v)
-		}
+		assert.True(t, obj.Has(k))
+		got, found := obj.Get(k)
+		assert.True(t, found)
+		assert.Equal(t, v, got)
 	}
 
 	// Check length
-	if obj.Length() != len(m) {
-		t.Errorf("Object length = %d, want %d", obj.Length(), len(m))
-	}
+	assert.Equal(t, len(m), obj.Length())
 }
 
 func TestFromJSON(t *testing.T) {
@@ -300,25 +266,23 @@ func TestFromJSON(t *testing.T) {
 	jsonData := []byte(`{"name":"John","age":30,"city":"New York"}`)
 
 	obj, err := FromJSON[any](jsonData)
-	if err != nil {
-		t.Fatalf("FromJSON() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	// Check all values
-	if got, found := obj.Get("name"); !found || got != "John" {
-		t.Errorf("Value for 'name' = %v (found: %v), want %v", got, found, "John")
-	}
-	if got, found := obj.Get("age"); !found || got != float64(30) {
-		t.Errorf("Value for 'age' = %v (found: %v), want %v", got, found, float64(30))
-	}
-	if got, found := obj.Get("city"); !found || got != "New York" {
-		t.Errorf("Value for 'city' = %v (found: %v), want %v", got, found, "New York")
-	}
+	name, found := obj.Get("name")
+	assert.True(t, found)
+	assert.Equal(t, "John", name)
+
+	age, found := obj.Get("age")
+	assert.True(t, found)
+	assert.Equal(t, float64(30), age)
+
+	city, found := obj.Get("city")
+	assert.True(t, found)
+	assert.Equal(t, "New York", city)
 
 	// Check length
-	if obj.Length() != 3 {
-		t.Errorf("Object length = %d, want %d", obj.Length(), 3)
-	}
+	assert.Equal(t, 3, obj.Length())
 }
 
 func TestClone(t *testing.T) {
@@ -333,12 +297,11 @@ func TestClone(t *testing.T) {
 	clone := original.Clone()
 
 	// Check all values
-	originalJSON, _ := json.Marshal(original)
-	cloneJSON, _ := json.Marshal(clone)
-
-	if string(originalJSON) != string(cloneJSON) {
-		t.Errorf("Clone JSON = %s, want %s", cloneJSON, originalJSON)
-	}
+	originalJSON, err := json.Marshal(original)
+	require.NoError(t, err)
+	cloneJSON, err := json.Marshal(clone)
+	require.NoError(t, err)
+	assert.Equal(t, string(originalJSON), string(cloneJSON))
 
 	// Modifying clone shouldn't affect original
 	clone.Set("b", 99)
@@ -346,15 +309,11 @@ func TestClone(t *testing.T) {
 	clone.Set("d", 4)
 
 	// Original should be unchanged
-	if got, found := original.Get("b"); !found || got != 2 {
-		t.Errorf("Original value for 'b' = %v (found: %v), want %v", got, found, 2)
-	}
-	if !original.Has("c") {
-		t.Errorf("Original should still have key 'c'")
-	}
-	if original.Has("d") {
-		t.Errorf("Original should not have key 'd'")
-	}
+	value, found := original.Get("b")
+	assert.True(t, found)
+	assert.Equal(t, 2, value)
+	assert.True(t, original.Has("c"))
+	assert.False(t, original.Has("d"))
 }
 
 func TestEntries(t *testing.T) {
@@ -374,17 +333,15 @@ func TestEntries(t *testing.T) {
 		{Key: "c", Value: 3},
 	}
 
-	if !reflect.DeepEqual(entries, expected) {
-		t.Errorf("Entries() = %v, want %v", entries, expected)
-	}
+	assert.Equal(t, expected, entries)
 
 	// Modifying returned entries shouldn't affect the original object
 	entries[0].Key = "x"
 	entries[0].Value = 99
 
-	if got, found := obj.Get("a"); !found || got != 1 {
-		t.Errorf("Original value for 'a' = %v (found: %v), want %v", got, found, 1)
-	}
+	value, found := obj.Get("a")
+	assert.True(t, found)
+	assert.Equal(t, 1, value)
 }
 
 func TestCapacity(t *testing.T) {
@@ -394,12 +351,8 @@ func TestCapacity(t *testing.T) {
 	obj := NewObject[any](3)
 
 	// Verify initial state
-	if cap(obj.entries) != 3 {
-		t.Errorf("Initial capacity = %d, want %d", cap(obj.entries), 3)
-	}
-	if obj.Length() != 0 {
-		t.Errorf("Initial length = %d, want %d", obj.Length(), 0)
-	}
+	assert.Equal(t, 3, cap(obj.entries))
+	assert.Equal(t, 0, obj.Length())
 
 	// Add entries up to capacity
 	obj.Set("a", 1)
@@ -407,12 +360,8 @@ func TestCapacity(t *testing.T) {
 	obj.Set("c", 3)
 
 	// Verify state at capacity
-	if cap(obj.entries) != 3 {
-		t.Errorf("Capacity at limit = %d, want %d", cap(obj.entries), 3)
-	}
-	if obj.Length() != 3 {
-		t.Errorf("Length at limit = %d, want %d", obj.Length(), 3)
-	}
+	assert.Equal(t, 3, cap(obj.entries))
+	assert.Equal(t, 3, obj.Length())
 
 	// Add more entries beyond capacity
 	obj.Set("d", 4)
@@ -421,33 +370,25 @@ func TestCapacity(t *testing.T) {
 	obj.Set("g", 7)
 
 	// Verify state after exceeding capacity
-	if obj.Length() != 7 {
-		t.Errorf("Length after exceeding capacity = %d, want %d", obj.Length(), 7)
-	}
-	if cap(obj.entries) < 7 {
-		t.Errorf("Capacity after exceeding limit = %d, want >= %d", cap(obj.entries), 7)
-	}
+	assert.Equal(t, 7, obj.Length())
+	assert.GreaterOrEqual(t, cap(obj.entries), 7)
 
 	// Verify all values are correct
 	expected := map[string]any{
 		"a": 1, "b": 2, "c": 3, "d": 4, "e": 5, "f": 6, "g": 7,
 	}
 	for k, v := range expected {
-		if got, found := obj.Get(k); !found || got != v {
-			t.Errorf("Value for key %s = %v (found: %v), want %v", k, got, found, v)
-		}
+		got, found := obj.Get(k)
+		assert.True(t, found)
+		assert.Equal(t, v, got)
 	}
 
 	// Verify order is preserved
 	expectedOrder := []string{"a", "b", "c", "d", "e", "f", "g"}
 	entries := obj.Entries()
-	if len(entries) != len(expectedOrder) {
-		t.Errorf("Number of entries = %d, want %d", len(entries), len(expectedOrder))
-	}
+	assert.Equal(t, len(expectedOrder), len(entries))
 	for i, entry := range entries {
-		if entry.Key != expectedOrder[i] {
-			t.Errorf("Entry[%d].Key = %s, want %s", i, entry.Key, expectedOrder[i])
-		}
+		assert.Equal(t, expectedOrder[i], entry.Key)
 	}
 }
 
@@ -477,24 +418,17 @@ func TestJSONRoundtrip(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc // capture
 		t.Run(tc.name, func(t *testing.T) {
 			// Parse JSON to Object
 			obj, err := FromJSON[any]([]byte(tc.jsonStr))
-			if err != nil {
-				t.Fatalf("FromJSON() error = %v", err)
-			}
+			require.NoError(t, err)
 
 			// Marshal back to JSON
 			jsonBytes, err := json.Marshal(obj)
-			if err != nil {
-				t.Fatalf("Marshal() error = %v", err)
-			}
+			require.NoError(t, err)
 
 			// Compare JSON strings directly
-			if got := string(jsonBytes); got != tc.jsonStr {
-				t.Errorf("JSON mismatch:\nOriginal: %s\nGot:      %s", tc.jsonStr, got)
-			}
+			assert.Equal(t, tc.jsonStr, string(jsonBytes))
 		})
 	}
 }
@@ -552,7 +486,6 @@ func TestJSONTags(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc // capture
 		t.Run(tc.name, func(t *testing.T) {
 			// Create an ordered object with the test struct
 			obj := NewObject[TestStruct](1)
@@ -560,46 +493,30 @@ func TestJSONTags(t *testing.T) {
 
 			// Marshal to JSON
 			data, err := json.Marshal(obj)
-			if err != nil {
-				t.Fatalf("Marshal() error = %v", err)
-			}
+			require.NoError(t, err)
 
 			// Compare with expected JSON
 			expected := `{"user":` + tc.expected + `}`
-			if got := string(data); got != expected {
-				t.Errorf("JSON mismatch:\nExpected: %s\nGot:      %s", expected, got)
-			}
+			assert.Equal(t, expected, string(data))
 
 			// Test roundtrip
 			var newObj Object[TestStruct]
-			if err := json.Unmarshal(data, &newObj); err != nil {
-				t.Fatalf("Unmarshal() error = %v", err)
-			}
+			err = json.Unmarshal(data, &newObj)
+			require.NoError(t, err)
 
 			// Verify the unmarshaled object
-			if value, found := newObj.Get("user"); found {
-				// Verify fields that should be preserved
-				if value.Name != tc.input.Name {
-					t.Errorf("Name = %v, want %v", value.Name, tc.input.Name)
-				}
-				if value.Age != tc.input.Age {
-					t.Errorf("Age = %v, want %v", value.Age, tc.input.Age)
-				}
-				if value.Email != tc.input.Email {
-					t.Errorf("Email = %v, want %v", value.Email, tc.input.Email)
-				}
-				if value.SecretKey != tc.input.SecretKey {
-					t.Errorf("SecretKey = %v, want %v", value.SecretKey, tc.input.SecretKey)
-				}
+			value, found := newObj.Get("user")
+			require.True(t, found, "Expected to find 'user' key in unmarshaled object")
 
-				// Verify that IsActive is zero value (false) after unmarshal
-				// This is expected behavior for fields with json:"-" tag
-				if value.IsActive != false {
-					t.Errorf("IsActive = %v, want false (zero value)", value.IsActive)
-				}
-			} else {
-				t.Error("Expected to find 'user' key in unmarshaled object")
-			}
+			// Verify fields that should be preserved
+			assert.Equal(t, tc.input.Name, value.Name)
+			assert.Equal(t, tc.input.Age, value.Age)
+			assert.Equal(t, tc.input.Email, value.Email)
+			assert.Equal(t, tc.input.SecretKey, value.SecretKey)
+
+			// Verify that IsActive is zero value (false) after unmarshal
+			// This is expected behavior for fields with json:"-" tag
+			assert.Equal(t, false, value.IsActive, "IsActive should be false (zero value)")
 		})
 	}
 }
@@ -617,9 +534,7 @@ func TestToMap(t *testing.T) {
 	m := obj.ToMap()
 
 	// Verify map contents
-	if len(m) != 3 {
-		t.Errorf("Map length = %d, want %d", len(m), 3)
-	}
+	assert.Equal(t, 3, len(m))
 
 	// Check all values exist
 	expected := map[string]any{
@@ -629,16 +544,16 @@ func TestToMap(t *testing.T) {
 	}
 
 	for k, v := range expected {
-		if got, ok := m[k]; !ok || got != v {
-			t.Errorf("Map[%s] = %v (found: %v), want %v", k, got, ok, v)
-		}
+		got, ok := m[k]
+		assert.True(t, ok)
+		assert.Equal(t, v, got)
 	}
 
 	// Verify modifying map doesn't affect original object
 	m["age"] = 31
-	if got, found := obj.Get("age"); !found || got != 30 {
-		t.Errorf("Original object age = %v (found: %v), want %v", got, found, 30)
-	}
+	got, found := obj.Get("age")
+	assert.True(t, found)
+	assert.Equal(t, 30, got)
 }
 
 func TestToJSON(t *testing.T) {
@@ -684,32 +599,24 @@ func TestToJSON(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc // capture
 		t.Run(tc.name, func(t *testing.T) {
 			// Convert to JSON
 			data, err := tc.object.ToJSON()
-			if err != nil {
-				t.Fatalf("ToJSON() error = %v", err)
-			}
+			require.NoError(t, err)
 
 			// Compare with expected JSON
-			if got := string(data); got != tc.expected {
-				t.Errorf("JSON mismatch:\nExpected: %s\nGot:      %s", tc.expected, got)
-			}
+			assert.Equal(t, tc.expected, string(data))
 
 			// Verify roundtrip
 			newObj, err := FromJSON[any](data)
-			if err != nil {
-				t.Fatalf("FromJSON() error = %v", err)
-			}
+			require.NoError(t, err)
 
 			// Compare original and new object
-			originalJSON, _ := tc.object.ToJSON()
-			newJSON, _ := newObj.ToJSON()
-			if string(originalJSON) != string(newJSON) {
-				t.Errorf("Roundtrip JSON mismatch:\nOriginal: %s\nNew:      %s",
-					string(originalJSON), string(newJSON))
-			}
+			originalJSON, err := tc.object.ToJSON()
+			require.NoError(t, err)
+			newJSON, err := newObj.ToJSON()
+			require.NoError(t, err)
+			assert.Equal(t, string(originalJSON), string(newJSON))
 		})
 	}
 }

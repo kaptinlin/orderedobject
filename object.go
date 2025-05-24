@@ -4,10 +4,18 @@ package orderedobject
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	json "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
+)
+
+var (
+	// ErrExpectedObjectStart is returned when the JSON token is not an object start
+	ErrExpectedObjectStart = errors.New("expected object start")
+	// ErrExpectedStringKey is returned when the JSON token is not a string key
+	ErrExpectedStringKey = errors.New("expected string key")
 )
 
 // Entry represents a key-value pair.
@@ -195,7 +203,7 @@ func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return err
 	}
 	if tok.Kind() != '{' {
-		return fmt.Errorf("expected object start, got %v", tok.Kind())
+		return fmt.Errorf("%w, got %v", ErrExpectedObjectStart, tok.Kind())
 	}
 
 	// Parse key-value pairs
@@ -206,7 +214,7 @@ func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 			return err
 		}
 		if tok.Kind() != '"' {
-			return fmt.Errorf("expected string key, got %v", tok.Kind())
+			return fmt.Errorf("%w, got %v", ErrExpectedStringKey, tok.Kind())
 		}
 		key := tok.String()
 
