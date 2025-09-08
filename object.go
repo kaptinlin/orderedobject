@@ -175,12 +175,20 @@ func (object *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 		if err := enc.WriteToken(jsontext.String(entry.Key)); err != nil {
 			return err
 		}
-		valueBytes, err := json.Marshal(entry.Value)
-		if err != nil {
-			return err
-		}
-		if err := enc.WriteValue(valueBytes); err != nil {
-			return err
+		
+		// Check if value is an OrderedObject and handle it specially
+		if nestedObj, ok := any(entry.Value).(*Object[any]); ok {
+			if err := nestedObj.MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		} else {
+			valueBytes, err := json.Marshal(entry.Value)
+			if err != nil {
+				return err
+			}
+			if err := enc.WriteValue(valueBytes); err != nil {
+				return err
+			}
 		}
 	}
 	return enc.WriteToken(jsontext.EndObject)

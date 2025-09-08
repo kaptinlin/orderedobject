@@ -2,7 +2,7 @@ module github.com/kaptinlin/orderedobject
 
 go 1.24.3
 
-require github.com/go-json-experiment/json v0.0.0-20250517221953-25912455fbc8
+require github.com/go-json-experiment/json v0.0.0-20250813233538-9b1f9ea2e11b
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
