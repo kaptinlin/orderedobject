@@ -18,6 +18,12 @@ var (
 	ErrExpectedStringKey = errors.New("expected string key")
 )
 
+// OrderedMarshaler is an interface for objects that can marshal themselves to JSON
+// while preserving key order.
+type OrderedMarshaler interface {
+	MarshalJSONTo(enc *jsontext.Encoder) error
+}
+
 // Entry represents a key-value pair.
 type Entry[V any] struct {
 	Key   string
@@ -176,9 +182,9 @@ func (object *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 			return err
 		}
 		
-		// Check if value is an OrderedObject and handle it specially
-		if nestedObj, ok := any(entry.Value).(*Object[any]); ok {
-			if err := nestedObj.MarshalJSONTo(enc); err != nil {
+		// Check if value implements OrderedMarshaler and handle it specially
+		if orderedMarshaler, ok := any(entry.Value).(OrderedMarshaler); ok {
+			if err := orderedMarshaler.MarshalJSONTo(enc); err != nil {
 				return err
 			}
 		} else {
@@ -228,6 +234,8 @@ func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 		// Read value
 		var value V
+		
+		// Read value using standard JSON unmarshaling
 		if err := json.UnmarshalDecode(dec, &value); err != nil {
 			return err
 		}
