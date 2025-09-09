@@ -438,7 +438,7 @@ func TestExplicitVsImplicitOrdering(t *testing.T) {
 		nested := NewObject[any]().
 			Set("theme", "dark").
 			Set("notifications", true)
-		
+
 		main := NewObject[any]().
 			Set("settings", nested).
 			Set("version", "1.0")

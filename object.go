@@ -181,7 +181,7 @@ func (object *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 		if err := enc.WriteToken(jsontext.String(entry.Key)); err != nil {
 			return err
 		}
-		
+
 		// Check if value implements OrderedMarshaler and handle it specially
 		if orderedMarshaler, ok := any(entry.Value).(OrderedMarshaler); ok {
 			if err := orderedMarshaler.MarshalJSONTo(enc); err != nil {
@@ -234,7 +234,7 @@ func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 		// Read value
 		var value V
-		
+
 		// Read value using standard JSON unmarshaling
 		if err := json.UnmarshalDecode(dec, &value); err != nil {
 			return err
