@@ -1,6 +1,8 @@
 package orderedobject
 
 import (
+	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -648,5 +650,107 @@ func TestToJSON(t *testing.T) {
 			// the new design only preserves order for explicitly created objects,
 			// not for objects parsed from JSON
 		})
+	}
+}
+
+func TestDeterministicMapOrdering(t *testing.T) {
+	t.Parallel()
+
+	// Test that nested maps are serialized deterministically
+	obj := NewObject[any](1)
+
+	// Create a regular Go map (which normally has non-deterministic iteration order)
+	nestedMap := map[string]any{
+		"zebra":      1,
+		"apple":      2,
+		"mango":      3,
+		"banana":     4,
+		"cherry":     5,
+		"dragon":     6,
+		"elderberry": 7,
+		"fig":        8,
+	}
+
+	obj.Set("fruits", nestedMap)
+
+	// Marshal multiple times and verify we get the same output
+	var outputs []string
+	for i := 0; i < 10; i++ {
+		data, err := obj.ToJSON()
+		require.NoError(t, err)
+		outputs = append(outputs, string(data))
+	}
+
+	// All outputs should be identical (deterministic)
+	firstOutput := outputs[0]
+	for i, output := range outputs {
+		assert.Equal(t, firstOutput, output, "Output %d differs from first output", i)
+	}
+
+	// Verify the map keys are sorted alphabetically (the default deterministic behavior)
+	assert.Contains(t, firstOutput, `"apple"`)
+	assert.Contains(t, firstOutput, `"banana"`)
+	assert.Contains(t, firstOutput, `"cherry"`)
+
+	// The keys should appear in sorted order in the JSON
+	appleIdx := bytes.Index([]byte(firstOutput), []byte(`"apple"`))
+	bananaIdx := bytes.Index([]byte(firstOutput), []byte(`"banana"`))
+	cherryIdx := bytes.Index([]byte(firstOutput), []byte(`"cherry"`))
+
+	assert.Less(t, appleIdx, bananaIdx, "apple should come before banana")
+	assert.Less(t, bananaIdx, cherryIdx, "banana should come before cherry")
+}
+
+// Benchmark tests
+func BenchmarkObjectSet(b *testing.B) {
+	obj := NewObject[any](100)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj.Set("key", i)
+	}
+}
+
+func BenchmarkObjectGet(b *testing.B) {
+	obj := NewObject[any](100)
+	for i := 0; i < 100; i++ {
+		obj.Set(fmt.Sprintf("key%d", i), i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj.Get("key50")
+	}
+}
+
+func BenchmarkObjectHas(b *testing.B) {
+	obj := NewObject[any](100)
+	for i := 0; i < 100; i++ {
+		obj.Set(fmt.Sprintf("key%d", i), i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj.Has("key50")
+	}
+}
+
+func BenchmarkObjectDelete(b *testing.B) {
+	obj := NewObject[any](100)
+	for i := 0; i < 100; i++ {
+		obj.Set(fmt.Sprintf("key%d", i), i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj.Delete("key50")
+	}
+}
+
+func BenchmarkObjectMarshalJSON(b *testing.B) {
+	obj := NewObject[any](10)
+	obj.Set("name", "John").
+		Set("age", 30).
+		Set("city", "New York").
+		Set("active", true)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = obj.MarshalJSON()
 	}
 }

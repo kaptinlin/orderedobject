@@ -67,28 +67,34 @@ func FromJSON[V any](data []byte) (*Object[V], error) {
 	return obj, nil
 }
 
+// findKeyIndex returns the index of the key in the entries slice, or -1 if not found.
+func (object *Object[V]) findKeyIndex(key string) int {
+	for i, entry := range object.entries {
+		if entry.Key == key {
+			return i
+		}
+	}
+	return -1
+}
+
 // Set sets the value for a key in the ordered object.
 // If the key already exists, its value is updated.
 // Otherwise, the key-value pair is appended to the end.
 // Returns the object for chaining.
 func (object *Object[V]) Set(key string, value V) *Object[V] {
-	for i, entry := range object.entries {
-		if entry.Key == key {
-			object.entries[i].Value = value
-			return object
-		}
+	if idx := object.findKeyIndex(key); idx >= 0 {
+		object.entries[idx].Value = value
+	} else {
+		object.entries = append(object.entries, Entry[V]{Key: key, Value: value})
 	}
-	object.entries = append(object.entries, Entry[V]{Key: key, Value: value})
 	return object
 }
 
 // Get returns the value for a key and whether the key exists.
 // If the key does not exist, it returns the zero value and false.
 func (object *Object[V]) Get(key string) (V, bool) {
-	for _, entry := range object.entries {
-		if entry.Key == key {
-			return entry.Value, true
-		}
+	if idx := object.findKeyIndex(key); idx >= 0 {
+		return object.entries[idx].Value, true
 	}
 	var zero V
 	return zero, false
@@ -96,23 +102,15 @@ func (object *Object[V]) Get(key string) (V, bool) {
 
 // Has returns whether the key exists in the ordered object.
 func (object *Object[V]) Has(key string) bool {
-	for _, entry := range object.entries {
-		if entry.Key == key {
-			return true
-		}
-	}
-	return false
+	return object.findKeyIndex(key) >= 0
 }
 
 // Delete removes a key-value pair from the ordered object.
 // If the key does not exist, it does nothing.
 // Returns the object for chaining.
 func (object *Object[V]) Delete(key string) *Object[V] {
-	for i, entry := range object.entries {
-		if entry.Key == key {
-			object.entries = append(object.entries[:i], object.entries[i+1:]...)
-			return object
-		}
+	if idx := object.findKeyIndex(key); idx >= 0 {
+		object.entries = append(object.entries[:idx], object.entries[idx+1:]...)
 	}
 	return object
 }
@@ -156,10 +154,9 @@ func (object *Object[V]) ForEach(fn func(key string, value V)) {
 
 // Clone returns a deep copy of the ordered object.
 func (object *Object[V]) Clone() *Object[V] {
-	clone := NewObject[V](len(object.entries))
-	clone.entries = make([]Entry[V], len(object.entries))
-	copy(clone.entries, object.entries)
-	return clone
+	entries := make([]Entry[V], len(object.entries))
+	copy(entries, object.entries)
+	return &Object[V]{entries: entries}
 }
 
 // MarshalJSON encodes the ordered object as JSON.
@@ -188,11 +185,8 @@ func (object *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 				return err
 			}
 		} else {
-			valueBytes, err := json.Marshal(entry.Value)
-			if err != nil {
-				return err
-			}
-			if err := enc.WriteValue(valueBytes); err != nil {
+			// Use Deterministic option to ensure nested maps have consistent ordering
+			if err := json.MarshalEncode(enc, entry.Value, json.Deterministic(true)); err != nil {
 				return err
 			}
 		}
@@ -234,21 +228,12 @@ func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 		// Read value
 		var value V
-
-		// Read value using standard JSON unmarshaling
 		if err := json.UnmarshalDecode(dec, &value); err != nil {
 			return err
 		}
 
 		// Add to entries
 		object.entries = append(object.entries, Entry[V]{Key: key, Value: value})
-
-		// If there's a comma, there's another entry
-		if dec.PeekKind() == ',' {
-			if _, err := dec.ReadToken(); err != nil {
-				return err
-			}
-		}
 	}
 
 	// Read the closing '}'
