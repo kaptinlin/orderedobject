@@ -1,11 +1,10 @@
-// Package orderedobject provides an ordered JSON object implementation
-// designed to work with github.com/go-json-experiment/json.
 package orderedobject
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 
 	json "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
@@ -110,7 +109,7 @@ func (object *Object[V]) Has(key string) bool {
 // Returns the object for chaining.
 func (object *Object[V]) Delete(key string) *Object[V] {
 	if idx := object.findKeyIndex(key); idx >= 0 {
-		object.entries = append(object.entries[:idx], object.entries[idx+1:]...)
+		object.entries = slices.Delete(object.entries, idx, idx+1)
 	}
 	return object
 }
