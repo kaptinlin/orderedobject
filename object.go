@@ -201,7 +201,8 @@ func (object *Object[V]) UnmarshalJSON(data []byte) error {
 
 // UnmarshalJSONFrom decodes a JSON object from a decoder into the ordered object.
 func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	// Reset the object
+	// Reset the object and clear old references for GC
+	clear(object.entries)
 	object.entries = object.entries[:0]
 
 	// Check for object start

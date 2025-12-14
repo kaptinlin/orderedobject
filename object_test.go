@@ -674,8 +674,8 @@ func TestDeterministicMapOrdering(t *testing.T) {
 	obj.Set("fruits", nestedMap)
 
 	// Marshal multiple times and verify we get the same output
-	var outputs []string
-	for i := 0; i < 10; i++ {
+	outputs := make([]string, 0, 10)
+	for range 10 {
 		data, err := obj.ToJSON()
 		require.NoError(t, err)
 		outputs = append(outputs, string(data))
@@ -705,40 +705,40 @@ func TestDeterministicMapOrdering(t *testing.T) {
 func BenchmarkObjectSet(b *testing.B) {
 	obj := NewObject[any](100)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		obj.Set("key", i)
+	for b.Loop() {
+		obj.Set("key", 42)
 	}
 }
 
 func BenchmarkObjectGet(b *testing.B) {
 	obj := NewObject[any](100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		obj.Get("key50")
 	}
 }
 
 func BenchmarkObjectHas(b *testing.B) {
 	obj := NewObject[any](100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		obj.Has("key50")
 	}
 }
 
 func BenchmarkObjectDelete(b *testing.B) {
 	obj := NewObject[any](100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		obj.Delete("key50")
 	}
 }
@@ -750,7 +750,7 @@ func BenchmarkObjectMarshalJSON(b *testing.B) {
 		Set("city", "New York").
 		Set("active", true)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = obj.MarshalJSON()
 	}
 }
