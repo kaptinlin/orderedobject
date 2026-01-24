@@ -29,3 +29,7 @@ Thumbs.db
 
 # Local binaries
 bin/
+
+
+# local
+*.local.json

@@ -754,3 +754,56 @@ func BenchmarkObjectMarshalJSON(b *testing.B) {
 		_, _ = obj.MarshalJSON()
 	}
 }
+
+func TestFromJSON_Errors(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name      string
+		input     string
+		wantError error
+	}{
+		{
+			name:      "Malformed JSON",
+			input:     `{"key": "value"`,
+			wantError: nil, // Expect syntax error
+		},
+		{
+			name:      "Not an object - Array",
+			input:     `["a", "b"]`,
+			wantError: ErrExpectedObjectStart,
+		},
+		{
+			name:      "Not an object - Primitive",
+			input:     `"hello"`,
+			wantError: ErrExpectedObjectStart,
+		},
+		{
+			name:      "Empty input",
+			input:     ``,
+			wantError: nil, // Expect EOF or similar
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := FromJSON[any]([]byte(tc.input))
+			require.Error(t, err)
+			if tc.wantError != nil {
+				assert.ErrorIs(t, err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestDuplicateKeys_Rejection(t *testing.T) {
+	t.Parallel()
+
+	// JSON with duplicate keys
+	// The underlying jsontext decoder rejects duplicate keys by default
+	jsonStr := `{"key": "value1", "key": "value2"}`
+
+	_, err := FromJSON[any]([]byte(jsonStr))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate object member name")
+}

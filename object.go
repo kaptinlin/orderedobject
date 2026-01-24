@@ -68,8 +68,8 @@ func FromJSON[V any](data []byte) (*Object[V], error) {
 
 // findKeyIndex returns the index of the key in the entries slice, or -1 if not found.
 func (object *Object[V]) findKeyIndex(key string) int {
-	for i, entry := range object.entries {
-		if entry.Key == key {
+	for i := range object.entries {
+		if object.entries[i].Key == key {
 			return i
 		}
 	}
@@ -122,8 +122,8 @@ func (object *Object[V]) Length() int {
 // Keys returns all keys in the ordered object.
 func (object *Object[V]) Keys() []string {
 	keys := make([]string, len(object.entries))
-	for i, entry := range object.entries {
-		keys[i] = entry.Key
+	for i := range object.entries {
+		keys[i] = object.entries[i].Key
 	}
 	return keys
 }
@@ -131,8 +131,8 @@ func (object *Object[V]) Keys() []string {
 // Values returns all values in the ordered object.
 func (object *Object[V]) Values() []V {
 	values := make([]V, len(object.entries))
-	for i, entry := range object.entries {
-		values[i] = entry.Value
+	for i := range object.entries {
+		values[i] = object.entries[i].Value
 	}
 	return values
 }
@@ -146,8 +146,8 @@ func (object *Object[V]) Entries() []Entry[V] {
 
 // ForEach executes a function for each key-value pair in the ordered object.
 func (object *Object[V]) ForEach(fn func(key string, value V)) {
-	for _, entry := range object.entries {
-		fn(entry.Key, entry.Value)
+	for i := range object.entries {
+		fn(object.entries[i].Key, object.entries[i].Value)
 	}
 }
 
@@ -173,19 +173,19 @@ func (object *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
 		return err
 	}
-	for _, entry := range object.entries {
-		if err := enc.WriteToken(jsontext.String(entry.Key)); err != nil {
+	for i := range object.entries {
+		if err := enc.WriteToken(jsontext.String(object.entries[i].Key)); err != nil {
 			return err
 		}
 
 		// Check if value implements OrderedMarshaler and handle it specially
-		if orderedMarshaler, ok := any(entry.Value).(OrderedMarshaler); ok {
+		if orderedMarshaler, ok := any(object.entries[i].Value).(OrderedMarshaler); ok {
 			if err := orderedMarshaler.MarshalJSONTo(enc); err != nil {
 				return err
 			}
 		} else {
 			// Use Deterministic option to ensure nested maps have consistent ordering
-			if err := json.MarshalEncode(enc, entry.Value, json.Deterministic(true)); err != nil {
+			if err := json.MarshalEncode(enc, object.entries[i].Value, json.Deterministic(true)); err != nil {
 				return err
 			}
 		}
