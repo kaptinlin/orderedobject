@@ -1,3 +1,5 @@
+// Package orderedobject provides an ordered JSON object that preserves
+// insertion order of keys, designed to work with go-json-experiment/json.
 package orderedobject
 
 import (
@@ -36,12 +38,12 @@ type Object[V any] struct {
 
 // NewObject returns an ordered object with optional pre-allocated capacity.
 func NewObject[V any](capacity ...int) *Object[V] {
-	cap := 0
+	n := 0
 	if len(capacity) > 0 {
-		cap = capacity[0]
+		n = capacity[0]
 	}
 	return &Object[V]{
-		entries: make([]Entry[V], 0, cap),
+		entries: make([]Entry[V], 0, n),
 	}
 }
 
@@ -55,13 +57,12 @@ func FromMap[V any](m map[string]V) *Object[V] {
 	return obj
 }
 
-// FromJSON parses a JSON string into an ordered object.
-// The order of keys will be preserved as in the JSON string.
+// FromJSON parses a JSON byte slice into an ordered object.
+// The order of keys is preserved as they appear in the JSON input.
 func FromJSON[V any](data []byte) (*Object[V], error) {
 	obj := NewObject[V]()
-	err := obj.UnmarshalJSON(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	if err := obj.UnmarshalJSON(data); err != nil {
+		return nil, err
 	}
 	return obj, nil
 }
@@ -178,15 +179,15 @@ func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 			return err
 		}
 
-		// Check if value implements OrderedMarshaler and handle it specially
+		// Preserve key order for nested ordered objects.
 		if m, ok := any(o.entries[i].Value).(OrderedMarshaler); ok {
 			if err := m.MarshalJSONTo(enc); err != nil {
 				return err
 			}
-		} else {
-			if err := json.MarshalEncode(enc, o.entries[i].Value, json.Deterministic(true)); err != nil {
-				return err
-			}
+			continue
+		}
+		if err := json.MarshalEncode(enc, o.entries[i].Value, json.Deterministic(true)); err != nil {
+			return err
 		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
