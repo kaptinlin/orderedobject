@@ -2,11 +2,11 @@ package orderedobject
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
 
 	json "github.com/go-json-experiment/json"
 )
@@ -14,78 +14,63 @@ import (
 func TestMarshal(t *testing.T) {
 	t.Parallel()
 
-	testCases := []struct {
-		name     string
-		object   *Object[any]
-		expected string
+	tests := []struct {
+		name string
+		obj  *Object[any]
+		want string
 	}{
 		{
-			name: "Empty object",
-			object: func() *Object[any] {
-				return NewObject[any](0)
-			}(),
-			expected: `{}`,
+			name: "empty object",
+			obj:  NewObject[any](0),
+			want: `{}`,
 		},
 		{
-			name: "Single key-value pair",
-			object: func() *Object[any] {
-				obj := NewObject[any](1)
-				obj.Set("key", "value")
-				return obj
-			}(),
-			expected: `{"key":"value"}`,
+			name: "single key-value pair",
+			obj:  NewObject[any](1).Set("key", "value"),
+			want: `{"key":"value"}`,
 		},
 		{
-			name: "Multiple key-value pairs",
-			object: func() *Object[any] {
-				obj := NewObject[any](3)
-				obj.Set("name", "John")
-				obj.Set("age", 30)
-				obj.Set("city", "New York")
-				return obj
-			}(),
-			expected: `{"name":"John","age":30,"city":"New York"}`,
+			name: "multiple key-value pairs",
+			obj: NewObject[any](3).
+				Set("name", "John").
+				Set("age", 30).
+				Set("city", "New York"),
+			want: `{"name":"John","age":30,"city":"New York"}`,
 		},
 		{
-			name: "Nested objects",
-			object: func() *Object[any] {
-				address := NewObject[any](2)
-				address.Set("street", "123 Main St")
-				address.Set("city", "London")
-
-				person := NewObject[any](3)
-				person.Set("name", "Alice")
-				person.Set("age", 28)
-				person.Set("address", address)
-
-				return person
+			name: "nested objects",
+			obj: func() *Object[any] {
+				address := NewObject[any](2).
+					Set("street", "123 Main St").
+					Set("city", "London")
+				return NewObject[any](3).
+					Set("name", "Alice").
+					Set("age", 28).
+					Set("address", address)
 			}(),
-			expected: `{"name":"Alice","age":28,"address":{"street":"123 Main St","city":"London"}}`,
+			want: `{"name":"Alice","age":28,"address":{"street":"123 Main St","city":"London"}}`,
 		},
 		{
-			name: "Array of objects",
-			object: func() *Object[any] {
-				person1 := NewObject[any](2)
-				person1.Set("name", "Bob")
-				person1.Set("age", 35)
-
-				person2 := NewObject[any](2)
-				person2.Set("name", "Charlie")
-				person2.Set("age", 40)
-
-				people := NewObject[any](1)
-				people.Set("people", []any{person1, person2})
-				return people
+			name: "array of objects",
+			obj: func() *Object[any] {
+				p1 := NewObject[any](2).Set("name", "Bob").Set("age", 35)
+				p2 := NewObject[any](2).Set("name", "Charlie").Set("age", 40)
+				return NewObject[any](1).Set("people", []any{p1, p2})
 			}(),
-			expected: `{"people":[{"name":"Bob","age":35},{"name":"Charlie","age":40}]}`,
+			want: `{"people":[{"name":"Bob","age":35},{"name":"Charlie","age":40}]}`,
 		},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			encoded, err := json.Marshal(tc.object) // Use v2 Marshal
-			require.NoError(t, err)
-			assert.Equal(t, tc.expected, string(encoded))
+			t.Parallel()
+			got, err := json.Marshal(tc.obj)
+			if err != nil {
+				t.Fatalf("json.Marshal() returned unexpected error: %v", err)
+			}
+			if string(got) != tc.want {
+				t.Errorf("json.Marshal() = %s, want %s", got, tc.want)
+			}
 		})
 	}
 }
@@ -93,10 +78,10 @@ func TestMarshal(t *testing.T) {
 func TestGet(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any](3)
-	obj.Set("string", "value")
-	obj.Set("int", 42)
-	obj.Set("bool", true)
+	obj := NewObject[any](3).
+		Set("string", "value").
+		Set("int", 42).
+		Set("bool", true)
 
 	tests := []struct {
 		name      string
@@ -104,37 +89,22 @@ func TestGet(t *testing.T) {
 		wantValue any
 		wantFound bool
 	}{
-		{
-			name:      "String value",
-			key:       "string",
-			wantValue: "value",
-			wantFound: true,
-		},
-		{
-			name:      "Int value",
-			key:       "int",
-			wantValue: 42,
-			wantFound: true,
-		},
-		{
-			name:      "Bool value",
-			key:       "bool",
-			wantValue: true,
-			wantFound: true,
-		},
-		{
-			name:      "Non-existent key",
-			key:       "missing",
-			wantValue: nil,
-			wantFound: false,
-		},
+		{name: "string value", key: "string", wantValue: "value", wantFound: true},
+		{name: "int value", key: "int", wantValue: 42, wantFound: true},
+		{name: "bool value", key: "bool", wantValue: true, wantFound: true},
+		{name: "non-existent key", key: "missing", wantValue: nil, wantFound: false},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotValue, gotFound := obj.Get(tt.key)
-			assert.Equal(t, tt.wantFound, gotFound)
-			assert.Equal(t, tt.wantValue, gotValue)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, found := obj.Get(tc.key)
+			if found != tc.wantFound {
+				t.Fatalf("Get(%q) found = %v, want %v", tc.key, found, tc.wantFound)
+			}
+			if got != tc.wantValue {
+				t.Errorf("Get(%q) = %v, want %v", tc.key, got, tc.wantValue)
+			}
 		})
 	}
 }
@@ -142,101 +112,101 @@ func TestGet(t *testing.T) {
 func TestHas(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any](2)
-	obj.Set("key", "value")
+	obj := NewObject[any](2).Set("key", "value")
 
-	assert.True(t, obj.Has("key"))
-	assert.False(t, obj.Has("missing"))
+	if !obj.Has("key") {
+		t.Error("Has(\"key\") = false, want true")
+	}
+	if obj.Has("missing") {
+		t.Error("Has(\"missing\") = true, want false")
+	}
 }
 
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any](3)
-	obj.Set("a", 1)
-	obj.Set("b", 2)
-	obj.Set("c", 3)
+	obj := NewObject[any](3).
+		Set("a", 1).Set("b", 2).Set("c", 3)
 
-	// Delete middle element and verify order is maintained
+	// Delete middle element and verify order is maintained.
 	obj.Delete("b")
 
-	expectedJSON := `{"a":1,"c":3}`
-	encoded, err := json.Marshal(obj)
-	require.NoError(t, err)
-	assert.Equal(t, expectedJSON, string(encoded))
+	got, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatalf("json.Marshal() returned unexpected error: %v", err)
+	}
+	if want := `{"a":1,"c":3}`; string(got) != want {
+		t.Errorf("json.Marshal() after Delete = %s, want %s", got, want)
+	}
+	if obj.Has("b") {
+		t.Error("Has(\"b\") after Delete = true, want false")
+	}
 
-	// Check key no longer exists
-	assert.False(t, obj.Has("b"))
-
-	// Delete non-existent key shouldn't affect object
+	// Delete non-existent key should be a no-op.
 	obj.Delete("missing")
-	assert.Equal(t, 2, obj.Len())
+	if got, want := obj.Len(), 2; got != want {
+		t.Errorf("Len() after no-op Delete = %d, want %d", got, want)
+	}
 }
 
 func TestForEach(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any](3)
-	obj.Set("a", 1)
-	obj.Set("b", 2)
-	obj.Set("c", 3)
+	obj := NewObject[any](3).
+		Set("a", 1).Set("b", 2).Set("c", 3)
 
-	keySum := ""
-	valueSum := 0
+	var keys string
+	var sum int
 
 	obj.ForEach(func(key string, value any) {
-		keySum += key
-		valueSum += value.(int)
+		keys += key
+		sum += value.(int)
 	})
 
-	assert.Equal(t, "abc", keySum)
-	assert.Equal(t, 6, valueSum)
-
-	// Verify values through Get
-	value, found := obj.Get("a")
-	assert.True(t, found)
-	assert.Equal(t, 1, value)
-
-	value, found = obj.Get("b")
-	assert.True(t, found)
-	assert.Equal(t, 2, value)
-
-	value, found = obj.Get("c")
-	assert.True(t, found)
-	assert.Equal(t, 3, value)
+	if keys != "abc" {
+		t.Errorf("ForEach keys = %q, want %q", keys, "abc")
+	}
+	if sum != 6 {
+		t.Errorf("ForEach sum = %d, want %d", sum, 6)
+	}
 }
 
 func TestLen(t *testing.T) {
 	t.Parallel()
 
 	obj := NewObject[any](0)
-	assert.Equal(t, 0, obj.Len())
+	if got := obj.Len(); got != 0 {
+		t.Errorf("Len() on empty = %d, want 0", got)
+	}
 
-	obj.Set("a", 1)
-	obj.Set("b", 2)
-	assert.Equal(t, 2, obj.Len())
+	obj.Set("a", 1).Set("b", 2)
+	if got := obj.Len(); got != 2 {
+		t.Errorf("Len() after two Sets = %d, want 2", got)
+	}
 
 	obj.Delete("a")
-	assert.Equal(t, 1, obj.Len())
+	if got := obj.Len(); got != 1 {
+		t.Errorf("Len() after Delete = %d, want 1", got)
+	}
 }
 
 func TestChaining(t *testing.T) {
 	t.Parallel()
 
-	// Test method chaining
 	obj := NewObject[any](0).
-		Set("a", 1).
-		Set("b", 2).
-		Set("c", 3)
+		Set("a", 1).Set("b", 2).Set("c", 3)
 
-	assert.Equal(t, 3, obj.Len())
+	if got := obj.Len(); got != 3 {
+		t.Errorf("Len() = %d, want 3", got)
+	}
 
-	sum := 0
-	obj.ForEach(func(key string, value any) {
-		sum += value.(int)
-	})
-
-	assert.Equal(t, 6, sum)
+	got, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatalf("json.Marshal() returned unexpected error: %v", err)
+	}
+	if want := `{"a":1,"b":2,"c":3}`; string(got) != want {
+		t.Errorf("json.Marshal() = %s, want %s", got, want)
+	}
 }
 
 func TestFromMap(t *testing.T) {
@@ -249,185 +219,196 @@ func TestFromMap(t *testing.T) {
 	}
 
 	obj := FromMap(m)
-
-	// Check all key-value pairs exist
-	for k, v := range m {
-		assert.True(t, obj.Has(k))
-		got, found := obj.Get(k)
-		assert.True(t, found)
-		assert.Equal(t, v, got)
+	if got, want := obj.Len(), len(m); got != want {
+		t.Fatalf("Len() = %d, want %d", got, want)
 	}
 
-	// Check length
-	assert.Equal(t, len(m), obj.Len())
+	for k, want := range m {
+		got, found := obj.Get(k)
+		if !found {
+			t.Errorf("Get(%q) not found", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("Get(%q) = %v, want %v", k, got, want)
+		}
+	}
 }
 
 func TestFromJSON(t *testing.T) {
 	t.Parallel()
 
-	jsonData := []byte(`{"name":"John","age":30,"city":"New York"}`)
+	obj, err := FromJSON[any]([]byte(`{"name":"John","age":30,"city":"New York"}`))
+	if err != nil {
+		t.Fatalf("FromJSON() returned unexpected error: %v", err)
+	}
+	if got := obj.Len(); got != 3 {
+		t.Fatalf("Len() = %d, want 3", got)
+	}
 
-	obj, err := FromJSON[any](jsonData)
-	require.NoError(t, err)
-
-	// Check all values
-	name, found := obj.Get("name")
-	assert.True(t, found)
-	assert.Equal(t, "John", name)
-
-	age, found := obj.Get("age")
-	assert.True(t, found)
-	assert.Equal(t, float64(30), age)
-
-	city, found := obj.Get("city")
-	assert.True(t, found)
-	assert.Equal(t, "New York", city)
-
-	// Check length
-	assert.Equal(t, 3, obj.Len())
+	tests := []struct {
+		key  string
+		want any
+	}{
+		{key: "name", want: "John"},
+		{key: "age", want: float64(30)},
+		{key: "city", want: "New York"},
+	}
+	for _, tc := range tests {
+		got, found := obj.Get(tc.key)
+		if !found {
+			t.Errorf("Get(%q) not found", tc.key)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("Get(%q) = %v, want %v", tc.key, got, tc.want)
+		}
+	}
 }
 
 func TestClone(t *testing.T) {
 	t.Parallel()
 
-	original := NewObject[any](3)
-	original.Set("a", 1)
-	original.Set("b", 2)
-	original.Set("c", 3)
+	original := NewObject[any](3).
+		Set("a", 1).Set("b", 2).Set("c", 3)
 
-	// Clone and check equal
 	clone := original.Clone()
 
-	// Check all values
-	originalJSON, err := json.Marshal(original)
-	require.NoError(t, err)
+	// Verify clone matches original.
+	origJSON, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("json.Marshal(original) returned unexpected error: %v", err)
+	}
 	cloneJSON, err := json.Marshal(clone)
-	require.NoError(t, err)
-	assert.Equal(t, string(originalJSON), string(cloneJSON))
+	if err != nil {
+		t.Fatalf("json.Marshal(clone) returned unexpected error: %v", err)
+	}
+	if string(origJSON) != string(cloneJSON) {
+		t.Errorf("Clone JSON = %s, want %s", cloneJSON, origJSON)
+	}
 
-	// Modifying clone shouldn't affect original
-	clone.Set("b", 99)
-	clone.Delete("c")
-	clone.Set("d", 4)
+	// Modifying clone must not affect original.
+	clone.Set("b", 99).Delete("c").Set("d", 4)
 
-	// Original should be unchanged
-	value, found := original.Get("b")
-	assert.True(t, found)
-	assert.Equal(t, 2, value)
-	assert.True(t, original.Has("c"))
-	assert.False(t, original.Has("d"))
+	val, found := original.Get("b")
+	if !found {
+		t.Fatal("original.Get(\"b\") not found after clone modification")
+	}
+	if val != 2 {
+		t.Errorf("original.Get(\"b\") = %v, want 2", val)
+	}
+	if !original.Has("c") {
+		t.Error("original.Has(\"c\") = false after clone Delete")
+	}
+	if original.Has("d") {
+		t.Error("original.Has(\"d\") = true after clone Set")
+	}
 }
 
 func TestEntries(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any](3)
-	obj.Set("a", 1)
-	obj.Set("b", 2)
-	obj.Set("c", 3)
+	obj := NewObject[any](3).
+		Set("a", 1).Set("b", 2).Set("c", 3)
 
-	entries := obj.Entries()
-
-	// Check all entries
-	expected := []Entry[any]{
+	got := obj.Entries()
+	want := []Entry[any]{
 		{Key: "a", Value: 1},
 		{Key: "b", Value: 2},
 		{Key: "c", Value: 3},
 	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Entries() mismatch (-want +got):\n%s", diff)
+	}
 
-	assert.Equal(t, expected, entries)
+	// Modifying returned entries must not affect the object.
+	got[0].Key = "x"
+	got[0].Value = 99
 
-	// Modifying returned entries shouldn't affect the original object
-	entries[0].Key = "x"
-	entries[0].Value = 99
-
-	value, found := obj.Get("a")
-	assert.True(t, found)
-	assert.Equal(t, 1, value)
+	val, found := obj.Get("a")
+	if !found {
+		t.Fatal("Get(\"a\") not found after modifying returned entries")
+	}
+	if val != 1 {
+		t.Errorf("Get(\"a\") = %v, want 1 (entries modification leaked)", val)
+	}
 }
 
 func TestCapacity(t *testing.T) {
 	t.Parallel()
 
-	// Create object with capacity 3
 	obj := NewObject[any](3)
+	if got := obj.Len(); got != 0 {
+		t.Errorf("Len() on new object = %d, want 0", got)
+	}
 
-	// Verify initial state
-	assert.Equal(t, 3, cap(obj.entries))
-	assert.Equal(t, 0, obj.Len())
+	// Add entries up to initial capacity.
+	obj.Set("a", 1).Set("b", 2).Set("c", 3)
+	if got := obj.Len(); got != 3 {
+		t.Errorf("Len() after 3 Sets = %d, want 3", got)
+	}
 
-	// Add entries up to capacity
-	obj.Set("a", 1)
-	obj.Set("b", 2)
-	obj.Set("c", 3)
+	// Add entries beyond initial capacity.
+	obj.Set("d", 4).Set("e", 5).Set("f", 6).Set("g", 7)
+	if got := obj.Len(); got != 7 {
+		t.Errorf("Len() after 7 Sets = %d, want 7", got)
+	}
 
-	// Verify state at capacity
-	assert.Equal(t, 3, cap(obj.entries))
-	assert.Equal(t, 3, obj.Len())
-
-	// Add more entries beyond capacity
-	obj.Set("d", 4)
-	obj.Set("e", 5)
-	obj.Set("f", 6)
-	obj.Set("g", 7)
-
-	// Verify state after exceeding capacity
-	assert.Equal(t, 7, obj.Len())
-	assert.GreaterOrEqual(t, cap(obj.entries), 7)
-
-	// Verify all values are correct
-	expected := map[string]any{
+	// Verify all values are correct.
+	want := map[string]any{
 		"a": 1, "b": 2, "c": 3, "d": 4, "e": 5, "f": 6, "g": 7,
 	}
-	for k, v := range expected {
+	for k, wantVal := range want {
 		got, found := obj.Get(k)
-		assert.True(t, found)
-		assert.Equal(t, v, got)
+		if !found {
+			t.Errorf("Get(%q) not found", k)
+			continue
+		}
+		if got != wantVal {
+			t.Errorf("Get(%q) = %v, want %v", k, got, wantVal)
+		}
 	}
 
-	// Verify order is preserved
-	expectedOrder := []string{"a", "b", "c", "d", "e", "f", "g"}
+	// Verify insertion order is preserved.
+	wantKeys := []string{"a", "b", "c", "d", "e", "f", "g"}
 	entries := obj.Entries()
-	assert.Equal(t, len(expectedOrder), len(entries))
+	if len(entries) != len(wantKeys) {
+		t.Fatalf("len(Entries()) = %d, want %d", len(entries), len(wantKeys))
+	}
 	for i, entry := range entries {
-		assert.Equal(t, expectedOrder[i], entry.Key)
+		if entry.Key != wantKeys[i] {
+			t.Errorf("Entries()[%d].Key = %q, want %q", i, entry.Key, wantKeys[i])
+		}
 	}
 }
 
 func TestJSONRoundtrip(t *testing.T) {
 	t.Parallel()
 
-	testCases := []struct {
-		name    string
-		jsonStr string
+	tests := []struct {
+		name string
+		json string
 	}{
-		{
-			name:    "Simple object",
-			jsonStr: `{"name":"John","age":30,"active":true,"score":95.5}`,
-		},
-		// Removed: Nested object test - new design doesn't preserve order in JSON-parsed nested objects
-		{
-			name:    "Empty object",
-			jsonStr: `{}`,
-		},
-		{
-			name:    "Object with null values",
-			jsonStr: `{"a":null,"b":null}`,
-		},
+		{name: "simple object", json: `{"name":"John","age":30,"active":true,"score":95.5}`},
+		{name: "empty object", json: `{}`},
+		{name: "object with null values", json: `{"a":null,"b":null}`},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Parse JSON to Object
-			obj, err := FromJSON[any]([]byte(tc.jsonStr))
-			require.NoError(t, err)
+			t.Parallel()
+			obj, err := FromJSON[any]([]byte(tc.json))
+			if err != nil {
+				t.Fatalf("FromJSON() returned unexpected error: %v", err)
+			}
 
-			// Marshal back to JSON
-			jsonBytes, err := json.Marshal(obj)
-			require.NoError(t, err)
-
-			// Compare JSON strings directly
-			assert.Equal(t, tc.jsonStr, string(jsonBytes))
+			got, err := json.Marshal(obj)
+			if err != nil {
+				t.Fatalf("json.Marshal() returned unexpected error: %v", err)
+			}
+			if string(got) != tc.json {
+				t.Errorf("roundtrip = %s, want %s", got, tc.json)
+			}
 		})
 	}
 }
@@ -435,127 +416,141 @@ func TestJSONRoundtrip(t *testing.T) {
 func TestExplicitVsImplicitOrdering(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Explicit creation preserves order", func(t *testing.T) {
-		// Explicitly create nested ordered objects
+	t.Run("explicit creation preserves order", func(t *testing.T) {
+		t.Parallel()
 		nested := NewObject[any]().
 			Set("theme", "dark").
 			Set("notifications", true)
 
-		main := NewObject[any]().
+		obj := NewObject[any]().
 			Set("settings", nested).
 			Set("version", "1.0")
 
-		data, err := main.ToJSON()
-		require.NoError(t, err)
-
-		// Order should be preserved for explicitly created objects
-		expected := `{"settings":{"theme":"dark","notifications":true},"version":"1.0"}`
-		assert.Equal(t, expected, string(data))
+		got, err := obj.ToJSON()
+		if err != nil {
+			t.Fatalf("ToJSON() returned unexpected error: %v", err)
+		}
+		want := `{"settings":{"theme":"dark","notifications":true},"version":"1.0"}`
+		if string(got) != want {
+			t.Errorf("ToJSON() = %s, want %s", got, want)
+		}
 	})
 
 	t.Run("JSON parsing uses standard behavior", func(t *testing.T) {
-		// Parse JSON - nested objects may not preserve order
-		jsonStr := `{"settings":{"theme":"dark","notifications":true},"version":"1.0"}`
-		obj, err := FromJSON[any]([]byte(jsonStr))
-		require.NoError(t, err)
+		t.Parallel()
+		obj, err := FromJSON[any]([]byte(`{"settings":{"theme":"dark","notifications":true},"version":"1.0"}`))
+		if err != nil {
+			t.Fatalf("FromJSON() returned unexpected error: %v", err)
+		}
 
-		// Top-level object preserves order
+		// Top-level object preserves order.
 		entries := obj.Entries()
-		assert.Equal(t, "settings", entries[0].Key)
-		assert.Equal(t, "version", entries[1].Key)
+		if len(entries) != 2 {
+			t.Fatalf("len(Entries()) = %d, want 2", len(entries))
+		}
+		if entries[0].Key != "settings" {
+			t.Errorf("Entries()[0].Key = %q, want %q", entries[0].Key, "settings")
+		}
+		if entries[1].Key != "version" {
+			t.Errorf("Entries()[1].Key = %q, want %q", entries[1].Key, "version")
+		}
 
-		// But nested objects (maps) may not preserve order - this is expected
-		settings := entries[0].Value.(map[string]any)
-		assert.Contains(t, settings, "theme")
-		assert.Contains(t, settings, "notifications")
-		// We don't assert order for nested map since it's not guaranteed
+		// Nested objects are plain maps — order is not guaranteed.
+		settings, ok := entries[0].Value.(map[string]any)
+		if !ok {
+			t.Fatalf("Entries()[0].Value type = %T, want map[string]any", entries[0].Value)
+		}
+		if _, has := settings["theme"]; !has {
+			t.Error("nested map missing key \"theme\"")
+		}
+		if _, has := settings["notifications"]; !has {
+			t.Error("nested map missing key \"notifications\"")
+		}
 	})
 }
 
 func TestJSONTags(t *testing.T) {
 	t.Parallel()
 
-	// Define a struct with various JSON tags
-	type TestStruct struct {
-		Name      string `json:"full_name"`            // Custom field name
-		Age       int    `json:"age"`                  // Standard field name
-		Email     string `json:"email,omitempty"`      // Omit if empty
-		IsActive  bool   `json:"-"`                    // Skip this field
-		SecretKey string `json:"secret_key,omitempty"` // Omit if empty
+	type testStruct struct {
+		Name      string `json:"full_name"`
+		Age       int    `json:"age"`
+		Email     string `json:"email,omitempty"`
+		IsActive  bool   `json:"-"`
+		SecretKey string `json:"secret_key,omitempty"`
 	}
 
-	testCases := []struct {
-		name     string
-		input    TestStruct
-		expected string
+	tests := []struct {
+		name  string
+		input testStruct
+		want  string
 	}{
 		{
-			name: "All fields populated",
-			input: TestStruct{
-				Name:      "John Doe",
-				Age:       30,
-				Email:     "john@example.com",
-				IsActive:  true,
+			name: "all fields populated",
+			input: testStruct{
+				Name: "John Doe", Age: 30,
+				Email: "john@example.com", IsActive: true,
 				SecretKey: "abc123",
 			},
-			expected: `{"full_name":"John Doe","age":30,"email":"john@example.com","secret_key":"abc123"}`,
+			want: `{"full_name":"John Doe","age":30,"email":"john@example.com","secret_key":"abc123"}`,
 		},
 		{
-			name: "Empty fields should be omitted",
-			input: TestStruct{
-				Name:      "Jane Smith",
-				Age:       25,
-				Email:     "",
-				IsActive:  true,
-				SecretKey: "",
+			name: "empty fields omitted",
+			input: testStruct{
+				Name: "Jane Smith", Age: 25,
+				IsActive: true,
 			},
-			expected: `{"full_name":"Jane Smith","age":25}`,
+			want: `{"full_name":"Jane Smith","age":25}`,
 		},
 		{
-			name: "IsActive should always be skipped",
-			input: TestStruct{
-				Name:      "Bob Wilson",
-				Age:       35,
+			name: "skipped field excluded",
+			input: testStruct{
+				Name: "Bob Wilson", Age: 35,
 				Email:     "bob@example.com",
-				IsActive:  false,
 				SecretKey: "xyz789",
 			},
-			expected: `{"full_name":"Bob Wilson","age":35,"email":"bob@example.com","secret_key":"xyz789"}`,
+			want: `{"full_name":"Bob Wilson","age":35,"email":"bob@example.com","secret_key":"xyz789"}`,
 		},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create an ordered object with the test struct
-			obj := NewObject[TestStruct](1)
-			obj.Set("user", tc.input)
+			t.Parallel()
+			obj := NewObject[testStruct](1).Set("user", tc.input)
 
-			// Marshal to JSON
-			data, err := json.Marshal(obj)
-			require.NoError(t, err)
+			got, err := json.Marshal(obj)
+			if err != nil {
+				t.Fatalf("json.Marshal() returned unexpected error: %v", err)
+			}
+			if want := `{"user":` + tc.want + `}`; string(got) != want {
+				t.Errorf("json.Marshal() = %s, want %s", got, want)
+			}
 
-			// Compare with expected JSON
-			expected := `{"user":` + tc.expected + `}`
-			assert.Equal(t, expected, string(data))
+			// Roundtrip.
+			var decoded Object[testStruct]
+			if err := json.Unmarshal(got, &decoded); err != nil {
+				t.Fatalf("json.Unmarshal() returned unexpected error: %v", err)
+			}
 
-			// Test roundtrip
-			var newObj Object[TestStruct]
-			err = json.Unmarshal(data, &newObj)
-			require.NoError(t, err)
-
-			// Verify the unmarshaled object
-			value, found := newObj.Get("user")
-			require.True(t, found, "Expected to find 'user' key in unmarshaled object")
-
-			// Verify fields that should be preserved
-			assert.Equal(t, tc.input.Name, value.Name)
-			assert.Equal(t, tc.input.Age, value.Age)
-			assert.Equal(t, tc.input.Email, value.Email)
-			assert.Equal(t, tc.input.SecretKey, value.SecretKey)
-
-			// Verify that IsActive is zero value (false) after unmarshal
-			// This is expected behavior for fields with json:"-" tag
-			assert.Equal(t, false, value.IsActive, "IsActive should be false (zero value)")
+			val, found := decoded.Get("user")
+			if !found {
+				t.Fatal("decoded.Get(\"user\") not found")
+			}
+			if val.Name != tc.input.Name {
+				t.Errorf("decoded Name = %q, want %q", val.Name, tc.input.Name)
+			}
+			if val.Age != tc.input.Age {
+				t.Errorf("decoded Age = %d, want %d", val.Age, tc.input.Age)
+			}
+			if val.Email != tc.input.Email {
+				t.Errorf("decoded Email = %q, want %q", val.Email, tc.input.Email)
+			}
+			if val.SecretKey != tc.input.SecretKey {
+				t.Errorf("decoded SecretKey = %q, want %q", val.SecretKey, tc.input.SecretKey)
+			}
+			if val.IsActive {
+				t.Error("decoded IsActive = true, want false (should be zero value)")
+			}
 		})
 	}
 }
@@ -563,92 +558,80 @@ func TestJSONTags(t *testing.T) {
 func TestToMap(t *testing.T) {
 	t.Parallel()
 
-	// Create test object
-	obj := NewObject[any](3)
-	obj.Set("name", "John").
-		Set("age", 30).
-		Set("city", "New York")
+	obj := NewObject[any](3).
+		Set("name", "John").Set("age", 30).Set("city", "New York")
 
-	// Convert to map
 	m := obj.ToMap()
-
-	// Verify map contents
-	assert.Equal(t, 3, len(m))
-
-	// Check all values exist
-	expected := map[string]any{
-		"name": "John",
-		"age":  30,
-		"city": "New York",
+	if got, want := len(m), 3; got != want {
+		t.Fatalf("len(ToMap()) = %d, want %d", got, want)
 	}
 
-	for k, v := range expected {
+	wantMap := map[string]any{
+		"name": "John", "age": 30, "city": "New York",
+	}
+	for k, want := range wantMap {
 		got, ok := m[k]
-		assert.True(t, ok)
-		assert.Equal(t, v, got)
+		if !ok {
+			t.Errorf("ToMap() missing key %q", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("ToMap()[%q] = %v, want %v", k, got, want)
+		}
 	}
 
-	// Verify modifying map doesn't affect original object
+	// Modifying map must not affect original object.
 	m["age"] = 31
 	got, found := obj.Get("age")
-	assert.True(t, found)
-	assert.Equal(t, 30, got)
+	if !found {
+		t.Fatal("Get(\"age\") not found after map modification")
+	}
+	if got != 30 {
+		t.Errorf("Get(\"age\") = %v, want 30 (map modification leaked)", got)
+	}
 }
 
 func TestToJSON(t *testing.T) {
 	t.Parallel()
 
-	testCases := []struct {
-		name     string
-		object   *Object[any]
-		expected string
+	tests := []struct {
+		name string
+		obj  *Object[any]
+		want string
 	}{
 		{
-			name: "Simple object",
-			object: func() *Object[any] {
-				obj := NewObject[any](3)
-				obj.Set("name", "John").
-					Set("age", 30).
-					Set("city", "New York")
-				return obj
-			}(),
-			expected: `{"name":"John","age":30,"city":"New York"}`,
+			name: "simple object",
+			obj: NewObject[any](3).
+				Set("name", "John").Set("age", 30).Set("city", "New York"),
+			want: `{"name":"John","age":30,"city":"New York"}`,
 		},
 		{
-			name: "Empty object",
-			object: func() *Object[any] {
-				return NewObject[any](0)
-			}(),
-			expected: `{}`,
+			name: "empty object",
+			obj:  NewObject[any](0),
+			want: `{}`,
 		},
 		{
-			name: "Nested object",
-			object: func() *Object[any] {
-				address := NewObject[any](2)
-				address.Set("street", "123 Main St").
-					Set("zipcode", "10001")
-
-				person := NewObject[any](2)
-				person.Set("name", "Alice").
-					Set("address", address)
-				return person
+			name: "nested object",
+			obj: func() *Object[any] {
+				addr := NewObject[any](2).
+					Set("street", "123 Main St").Set("zipcode", "10001")
+				return NewObject[any](2).
+					Set("name", "Alice").Set("address", addr)
 			}(),
-			expected: `{"name":"Alice","address":{"street":"123 Main St","zipcode":"10001"}}`,
+			want: `{"name":"Alice","address":{"street":"123 Main St","zipcode":"10001"}}`,
 		},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Convert to JSON - order should be preserved for explicitly created objects
-			data, err := tc.object.ToJSON()
-			require.NoError(t, err)
-
-			// Compare with expected JSON
-			assert.Equal(t, tc.expected, string(data))
-
-			// Note: We don't test roundtrip for nested objects because
-			// the new design only preserves order for explicitly created objects,
-			// not for objects parsed from JSON
+			t.Parallel()
+			got, err := tc.obj.ToJSON()
+			if err != nil {
+				t.Fatalf("ToJSON() returned unexpected error: %v", err)
+			}
+			if string(got) != tc.want {
+				t.Errorf("ToJSON() = %s, want %s", got, tc.want)
+			}
 		})
 	}
 }
@@ -656,52 +639,82 @@ func TestToJSON(t *testing.T) {
 func TestDeterministicMapOrdering(t *testing.T) {
 	t.Parallel()
 
-	// Test that nested maps are serialized deterministically
-	obj := NewObject[any](1)
+	obj := NewObject[any](1).Set("fruits", map[string]any{
+		"zebra": 1, "apple": 2, "mango": 3, "banana": 4,
+		"cherry": 5, "dragon": 6, "elderberry": 7, "fig": 8,
+	})
 
-	// Create a regular Go map (which normally has non-deterministic iteration order)
-	nestedMap := map[string]any{
-		"zebra":      1,
-		"apple":      2,
-		"mango":      3,
-		"banana":     4,
-		"cherry":     5,
-		"dragon":     6,
-		"elderberry": 7,
-		"fig":        8,
+	// Marshal multiple times — output must be identical.
+	var first string
+	for i := range 10 {
+		got, err := obj.ToJSON()
+		if err != nil {
+			t.Fatalf("ToJSON() iteration %d returned unexpected error: %v", i, err)
+		}
+		if i == 0 {
+			first = string(got)
+		}
+		if string(got) != first {
+			t.Errorf("ToJSON() iteration %d = %s, want %s", i, got, first)
+		}
 	}
 
-	obj.Set("fruits", nestedMap)
+	// Keys must appear in sorted order.
+	b := []byte(first)
+	appleIdx := bytes.Index(b, []byte(`"apple"`))
+	bananaIdx := bytes.Index(b, []byte(`"banana"`))
+	cherryIdx := bytes.Index(b, []byte(`"cherry"`))
 
-	// Marshal multiple times and verify we get the same output
-	outputs := make([]string, 0, 10)
-	for range 10 {
-		data, err := obj.ToJSON()
-		require.NoError(t, err)
-		outputs = append(outputs, string(data))
+	if appleIdx >= bananaIdx {
+		t.Errorf("apple index (%d) >= banana index (%d)", appleIdx, bananaIdx)
+	}
+	if bananaIdx >= cherryIdx {
+		t.Errorf("banana index (%d) >= cherry index (%d)", bananaIdx, cherryIdx)
+	}
+}
+
+func TestFromJSON_Errors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     string
+		wantError error
+	}{
+		{name: "malformed JSON", input: `{"key": "value"`},
+		{name: "array instead of object", input: `["a", "b"]`, wantError: ErrExpectedObjectStart},
+		{name: "primitive instead of object", input: `"hello"`, wantError: ErrExpectedObjectStart},
+		{name: "empty input", input: ``},
 	}
 
-	// All outputs should be identical (deterministic)
-	firstOutput := outputs[0]
-	for i, output := range outputs {
-		assert.Equal(t, firstOutput, output, "Output %d differs from first output", i)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := FromJSON[any]([]byte(tc.input))
+			if err == nil {
+				t.Fatal("FromJSON() returned nil error, want error")
+			}
+			if tc.wantError != nil && !errors.Is(err, tc.wantError) {
+				t.Errorf("FromJSON() error = %v, want %v", err, tc.wantError)
+			}
+		})
 	}
+}
 
-	// Verify the map keys are sorted alphabetically (the default deterministic behavior)
-	assert.Contains(t, firstOutput, `"apple"`)
-	assert.Contains(t, firstOutput, `"banana"`)
-	assert.Contains(t, firstOutput, `"cherry"`)
+func TestDuplicateKeys_Rejection(t *testing.T) {
+	t.Parallel()
 
-	// The keys should appear in sorted order in the JSON
-	appleIdx := bytes.Index([]byte(firstOutput), []byte(`"apple"`))
-	bananaIdx := bytes.Index([]byte(firstOutput), []byte(`"banana"`))
-	cherryIdx := bytes.Index([]byte(firstOutput), []byte(`"cherry"`))
-
-	assert.Less(t, appleIdx, bananaIdx, "apple should come before banana")
-	assert.Less(t, bananaIdx, cherryIdx, "banana should come before cherry")
+	_, err := FromJSON[any]([]byte(`{"key": "value1", "key": "value2"}`))
+	if err == nil {
+		t.Fatal("FromJSON() with duplicate keys returned nil error, want error")
+	}
+	if got := err.Error(); !bytes.Contains([]byte(got), []byte("duplicate object member name")) {
+		t.Errorf("FromJSON() error = %q, want error containing %q", got, "duplicate object member name")
+	}
 }
 
 // Benchmark tests
+
 func BenchmarkObjectSet(b *testing.B) {
 	obj := NewObject[any](100)
 	b.ResetTimer()
@@ -753,57 +766,4 @@ func BenchmarkObjectMarshalJSON(b *testing.B) {
 	for b.Loop() {
 		_, _ = obj.MarshalJSON()
 	}
-}
-
-func TestFromJSON_Errors(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name      string
-		input     string
-		wantError error
-	}{
-		{
-			name:      "Malformed JSON",
-			input:     `{"key": "value"`,
-			wantError: nil, // Expect syntax error
-		},
-		{
-			name:      "Not an object - Array",
-			input:     `["a", "b"]`,
-			wantError: ErrExpectedObjectStart,
-		},
-		{
-			name:      "Not an object - Primitive",
-			input:     `"hello"`,
-			wantError: ErrExpectedObjectStart,
-		},
-		{
-			name:      "Empty input",
-			input:     ``,
-			wantError: nil, // Expect EOF or similar
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := FromJSON[any]([]byte(tc.input))
-			require.Error(t, err)
-			if tc.wantError != nil {
-				assert.ErrorIs(t, err, tc.wantError)
-			}
-		})
-	}
-}
-
-func TestDuplicateKeys_Rejection(t *testing.T) {
-	t.Parallel()
-
-	// JSON with duplicate keys
-	// The underlying jsontext decoder rejects duplicate keys by default
-	jsonStr := `{"key": "value1", "key": "value2"}`
-
-	_, err := FromJSON[any]([]byte(jsonStr))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate object member name")
 }
