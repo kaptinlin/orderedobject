@@ -709,6 +709,192 @@ func TestDuplicateKeys_Rejection(t *testing.T) {
 	}
 }
 
+func TestKeys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("populated object", func(t *testing.T) {
+		t.Parallel()
+		obj := NewObject[any]().Set("a", 1).Set("b", 2).Set("c", 3)
+		got := obj.Keys()
+		want := []string{"a", "b", "c"}
+		if len(got) != len(want) {
+			t.Fatalf("len(Keys()) = %d, want %d", len(got), len(want))
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("Keys()[%d] = %q, want %q", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("empty object", func(t *testing.T) {
+		t.Parallel()
+		obj := NewObject[any]()
+		if got := obj.Keys(); len(got) != 0 {
+			t.Errorf("Keys() on empty = %v, want empty", got)
+		}
+	})
+}
+
+func TestValues(t *testing.T) {
+	t.Parallel()
+
+	t.Run("populated object", func(t *testing.T) {
+		t.Parallel()
+		obj := NewObject[any]().Set("a", 1).Set("b", 2).Set("c", 3)
+		got := obj.Values()
+		want := []any{1, 2, 3}
+		if len(got) != len(want) {
+			t.Fatalf("len(Values()) = %d, want %d", len(got), len(want))
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("Values()[%d] = %v, want %v", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("empty object", func(t *testing.T) {
+		t.Parallel()
+		obj := NewObject[any]()
+		if got := obj.Values(); len(got) != 0 {
+			t.Errorf("Values() on empty = %v, want empty", got)
+		}
+	})
+}
+
+func TestMarshalJSON_Direct(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[any]().Set("x", 1).Set("y", 2)
+	got, err := obj.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON() returned unexpected error: %v", err)
+	}
+	want := `{"x":1,"y":2}` + "\n"
+	if string(got) != want {
+		t.Errorf("MarshalJSON() = %q, want %q", got, want)
+	}
+}
+
+func TestMarshalJSONTo_NestedOrderedMarshaler(t *testing.T) {
+	t.Parallel()
+
+	inner := NewObject[any]().Set("z", 3).Set("w", 4)
+	outer := NewObject[any]().Set("nested", inner)
+
+	got, err := outer.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON() returned unexpected error: %v", err)
+	}
+	want := `{"nested":{"z":3,"w":4}}` + "\n"
+	if string(got) != want {
+		t.Errorf("MarshalJSON() = %q, want %q", got, want)
+	}
+}
+
+func TestMarshalJSONTo_UnmarshalableValue(t *testing.T) {
+	t.Parallel()
+
+	// Functions cannot be marshaled to JSON.
+	obj := NewObject[any]().Set("fn", func() {})
+	_, err := obj.MarshalJSON()
+	if err == nil {
+		t.Fatal("MarshalJSON() with unmarshalable value returned nil error")
+	}
+}
+
+func TestUnmarshalJSONFrom_NotAnObject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     string
+		wantError error
+	}{
+		{
+			name:      "number instead of object",
+			input:     `42`,
+			wantError: ErrExpectedObjectStart,
+		},
+		{
+			name:      "boolean instead of object",
+			input:     `true`,
+			wantError: ErrExpectedObjectStart,
+		},
+		{
+			name:      "null instead of object",
+			input:     `null`,
+			wantError: ErrExpectedObjectStart,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var obj Object[any]
+			err := obj.UnmarshalJSON([]byte(tc.input))
+			if err == nil {
+				t.Fatal("UnmarshalJSON() returned nil error, want error")
+			}
+			if !errors.Is(err, tc.wantError) {
+				t.Errorf("error = %v, want %v", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestUnmarshalJSON_ClearsExistingEntries(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[any]().Set("old", "data")
+	if err := obj.UnmarshalJSON([]byte(`{"new":"value"}`)); err != nil {
+		t.Fatalf("UnmarshalJSON() returned unexpected error: %v", err)
+	}
+	if obj.Has("old") {
+		t.Error("Has(\"old\") = true after UnmarshalJSON, want false")
+	}
+	got, found := obj.Get("new")
+	if !found {
+		t.Fatal("Get(\"new\") not found")
+	}
+	if got != "value" {
+		t.Errorf("Get(\"new\") = %v, want %q", got, "value")
+	}
+}
+
+func TestNewObject_NoCapacity(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[any]()
+	obj.Set("a", 1)
+	if got := obj.Len(); got != 1 {
+		t.Errorf("Len() = %d, want 1", got)
+	}
+}
+
+func TestSetUpdateExistingKey(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[any]().Set("a", 1).Set("b", 2).Set("a", 99)
+
+	got, found := obj.Get("a")
+	if !found {
+		t.Fatal("Get(\"a\") not found")
+	}
+	if got != 99 {
+		t.Errorf("Get(\"a\") = %v, want 99", got)
+	}
+	// Order must be preserved: "a" stays at index 0.
+	keys := obj.Keys()
+	if keys[0] != "a" {
+		t.Errorf("Keys()[0] = %q, want %q", keys[0], "a")
+	}
+	if obj.Len() != 2 {
+		t.Errorf("Len() = %d, want 2", obj.Len())
+	}
+}
+
 // Benchmark tests
 
 func BenchmarkObjectSet(b *testing.B) {
