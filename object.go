@@ -38,7 +38,7 @@ type Object[V any] struct {
 
 // NewObject returns an ordered object with optional pre-allocated capacity.
 func NewObject[V any](capacity ...int) *Object[V] {
-	n := 0
+	var n int
 	if len(capacity) > 0 {
 		n = capacity[0]
 	}
@@ -84,9 +84,9 @@ func (o *Object[V]) findKeyIndex(key string) int {
 func (o *Object[V]) Set(key string, value V) *Object[V] {
 	if idx := o.findKeyIndex(key); idx >= 0 {
 		o.entries[idx].Value = value
-	} else {
-		o.entries = append(o.entries, Entry[V]{Key: key, Value: value})
+		return o
 	}
+	o.entries = append(o.entries, Entry[V]{Key: key, Value: value})
 	return o
 }
 
@@ -140,9 +140,7 @@ func (o *Object[V]) Values() []V {
 
 // Entries returns a copy of all key-value pairs in insertion order.
 func (o *Object[V]) Entries() []Entry[V] {
-	entries := make([]Entry[V], len(o.entries))
-	copy(entries, o.entries)
-	return entries
+	return slices.Clone(o.entries)
 }
 
 // ForEach calls fn for each key-value pair in insertion order.
@@ -154,9 +152,7 @@ func (o *Object[V]) ForEach(fn func(key string, value V)) {
 
 // Clone returns a shallow copy of the ordered object.
 func (o *Object[V]) Clone() *Object[V] {
-	entries := make([]Entry[V], len(o.entries))
-	copy(entries, o.entries)
-	return &Object[V]{entries: entries}
+	return &Object[V]{entries: slices.Clone(o.entries)}
 }
 
 // MarshalJSON encodes the ordered object as JSON.
