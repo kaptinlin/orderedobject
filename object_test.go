@@ -3,7 +3,6 @@ package orderedobject
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -254,14 +253,16 @@ func TestFromJSON(t *testing.T) {
 		{key: "city", want: "New York"},
 	}
 	for _, tc := range tests {
-		got, found := obj.Get(tc.key)
-		if !found {
-			t.Errorf("Get(%q) not found", tc.key)
-			continue
-		}
-		if got != tc.want {
-			t.Errorf("Get(%q) = %v, want %v", tc.key, got, tc.want)
-		}
+		t.Run(tc.key, func(t *testing.T) {
+			t.Parallel()
+			got, found := obj.Get(tc.key)
+			if !found {
+				t.Fatalf("Get(%q) not found", tc.key)
+			}
+			if got != tc.want {
+				t.Errorf("Get(%q) = %v, want %v", tc.key, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -311,13 +312,19 @@ func TestEntries(t *testing.T) {
 		Set("a", 1).Set("b", 2).Set("c", 3)
 
 	got := obj.Entries()
-	want := []Entry[any]{
-		{Key: "a", Value: 1},
-		{Key: "b", Value: 2},
-		{Key: "c", Value: 3},
+	wantKeys := []string{"a", "b", "c"}
+	wantVals := []any{1, 2, 3}
+
+	if len(got) != len(wantKeys) {
+		t.Fatalf("len(Entries()) = %d, want %d", len(got), len(wantKeys))
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Entries() = %v, want %v", got, want)
+	for i, entry := range got {
+		if entry.Key != wantKeys[i] {
+			t.Errorf("Entries()[%d].Key = %q, want %q", i, entry.Key, wantKeys[i])
+		}
+		if entry.Value != wantVals[i] {
+			t.Errorf("Entries()[%d].Value = %v, want %v", i, entry.Value, wantVals[i])
+		}
 	}
 
 	// Modifying returned entries must not affect the object.
