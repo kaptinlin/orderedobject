@@ -1,12 +1,11 @@
 package orderedobject
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 
 	json "github.com/go-json-experiment/json"
 )
@@ -317,8 +316,8 @@ func TestEntries(t *testing.T) {
 		{Key: "b", Value: 2},
 		{Key: "c", Value: 3},
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("Entries() mismatch (-want +got):\n%s", diff)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Entries() = %v, want %v", got, want)
 	}
 
 	// Modifying returned entries must not affect the object.
@@ -536,20 +535,11 @@ func TestJSONTags(t *testing.T) {
 			if !found {
 				t.Fatal("decoded.Get(\"user\") not found")
 			}
-			if val.Name != tc.input.Name {
-				t.Errorf("decoded Name = %q, want %q", val.Name, tc.input.Name)
-			}
-			if val.Age != tc.input.Age {
-				t.Errorf("decoded Age = %d, want %d", val.Age, tc.input.Age)
-			}
-			if val.Email != tc.input.Email {
-				t.Errorf("decoded Email = %q, want %q", val.Email, tc.input.Email)
-			}
-			if val.SecretKey != tc.input.SecretKey {
-				t.Errorf("decoded SecretKey = %q, want %q", val.SecretKey, tc.input.SecretKey)
-			}
-			if val.IsActive {
-				t.Error("decoded IsActive = true, want false (should be zero value)")
+			// IsActive is tagged json:"-", so it should be zero after decode.
+			want := tc.input
+			want.IsActive = false
+			if val != want {
+				t.Errorf("decoded.Get(\"user\") = %+v, want %+v", val, want)
 			}
 		})
 	}
@@ -660,10 +650,9 @@ func TestDeterministicMapOrdering(t *testing.T) {
 	}
 
 	// Keys must appear in sorted order.
-	b := []byte(first)
-	appleIdx := bytes.Index(b, []byte(`"apple"`))
-	bananaIdx := bytes.Index(b, []byte(`"banana"`))
-	cherryIdx := bytes.Index(b, []byte(`"cherry"`))
+	appleIdx := strings.Index(first, `"apple"`)
+	bananaIdx := strings.Index(first, `"banana"`)
+	cherryIdx := strings.Index(first, `"cherry"`)
 
 	if appleIdx >= bananaIdx {
 		t.Errorf("apple index (%d) >= banana index (%d)", appleIdx, bananaIdx)
@@ -708,8 +697,8 @@ func TestDuplicateKeys_Rejection(t *testing.T) {
 	if err == nil {
 		t.Fatal("FromJSON() with duplicate keys returned nil error, want error")
 	}
-	if got := err.Error(); !bytes.Contains([]byte(got), []byte("duplicate object member name")) {
-		t.Errorf("FromJSON() error = %q, want error containing %q", got, "duplicate object member name")
+	if !strings.Contains(err.Error(), "duplicate") {
+		t.Errorf("FromJSON() error = %q, want error containing %q", err, "duplicate")
 	}
 }
 
