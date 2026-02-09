@@ -11,13 +11,13 @@ import (
 )
 
 var (
-	// ErrExpectedObjectStart is returned when the JSON token is not an object start
+	// ErrExpectedObjectStart is returned when the JSON token is not '{'.
 	ErrExpectedObjectStart = errors.New("expected object start")
-	// ErrExpectedStringKey is returned when the JSON token is not a string key
+	// ErrExpectedStringKey is returned when the JSON token is not a string key.
 	ErrExpectedStringKey = errors.New("expected string key")
 )
 
-// OrderedMarshaler is an interface for objects that can marshal themselves to JSON
+// OrderedMarshaler is an interface for types that marshal themselves to JSON
 // while preserving key order.
 type OrderedMarshaler interface {
 	MarshalJSONTo(enc *jsontext.Encoder) error
@@ -67,9 +67,9 @@ func FromJSON[V any](data []byte) (*Object[V], error) {
 }
 
 // findKeyIndex returns the index of the key in the entries slice, or -1 if not found.
-func (object *Object[V]) findKeyIndex(key string) int {
-	for i := range object.entries {
-		if object.entries[i].Key == key {
+func (o *Object[V]) findKeyIndex(key string) int {
+	for i := range o.entries {
+		if o.entries[i].Key == key {
 			return i
 		}
 	}
@@ -77,115 +77,114 @@ func (object *Object[V]) findKeyIndex(key string) int {
 }
 
 // Set sets the value for a key in the ordered object.
-// If the key already exists, its value is updated.
+// If the key already exists, its value is updated in place.
 // Otherwise, the key-value pair is appended to the end.
-// Returns the object for chaining.
-func (object *Object[V]) Set(key string, value V) *Object[V] {
-	if idx := object.findKeyIndex(key); idx >= 0 {
-		object.entries[idx].Value = value
+// Returns the object for method chaining.
+func (o *Object[V]) Set(key string, value V) *Object[V] {
+	if idx := o.findKeyIndex(key); idx >= 0 {
+		o.entries[idx].Value = value
 	} else {
-		object.entries = append(object.entries, Entry[V]{Key: key, Value: value})
+		o.entries = append(o.entries, Entry[V]{Key: key, Value: value})
 	}
-	return object
+	return o
 }
 
 // Get returns the value for a key and whether the key exists.
 // If the key does not exist, it returns the zero value and false.
-func (object *Object[V]) Get(key string) (V, bool) {
-	if idx := object.findKeyIndex(key); idx >= 0 {
-		return object.entries[idx].Value, true
+func (o *Object[V]) Get(key string) (V, bool) {
+	if idx := o.findKeyIndex(key); idx >= 0 {
+		return o.entries[idx].Value, true
 	}
 	var zero V
 	return zero, false
 }
 
-// Has returns whether the key exists in the ordered object.
-func (object *Object[V]) Has(key string) bool {
-	return object.findKeyIndex(key) >= 0
+// Has reports whether the key exists in the ordered object.
+func (o *Object[V]) Has(key string) bool {
+	return o.findKeyIndex(key) >= 0
 }
 
 // Delete removes a key-value pair from the ordered object.
-// If the key does not exist, it does nothing.
-// Returns the object for chaining.
-func (object *Object[V]) Delete(key string) *Object[V] {
-	if idx := object.findKeyIndex(key); idx >= 0 {
-		object.entries = slices.Delete(object.entries, idx, idx+1)
+// If the key does not exist, it is a no-op.
+// Returns the object for method chaining.
+func (o *Object[V]) Delete(key string) *Object[V] {
+	if idx := o.findKeyIndex(key); idx >= 0 {
+		o.entries = slices.Delete(o.entries, idx, idx+1)
 	}
-	return object
+	return o
 }
 
-// Length returns the number of key-value pairs in the ordered object.
-func (object *Object[V]) Length() int {
-	return len(object.entries)
+// Len returns the number of key-value pairs in the ordered object.
+func (o *Object[V]) Len() int {
+	return len(o.entries)
 }
 
-// Keys returns all keys in the ordered object.
-func (object *Object[V]) Keys() []string {
-	keys := make([]string, len(object.entries))
-	for i := range object.entries {
-		keys[i] = object.entries[i].Key
+// Keys returns all keys in insertion order.
+func (o *Object[V]) Keys() []string {
+	keys := make([]string, len(o.entries))
+	for i := range o.entries {
+		keys[i] = o.entries[i].Key
 	}
 	return keys
 }
 
-// Values returns all values in the ordered object.
-func (object *Object[V]) Values() []V {
-	values := make([]V, len(object.entries))
-	for i := range object.entries {
-		values[i] = object.entries[i].Value
+// Values returns all values in insertion order.
+func (o *Object[V]) Values() []V {
+	values := make([]V, len(o.entries))
+	for i := range o.entries {
+		values[i] = o.entries[i].Value
 	}
 	return values
 }
 
-// Entries returns all key-value pairs in the ordered object.
-func (object *Object[V]) Entries() []Entry[V] {
-	entries := make([]Entry[V], len(object.entries))
-	copy(entries, object.entries)
+// Entries returns a copy of all key-value pairs in insertion order.
+func (o *Object[V]) Entries() []Entry[V] {
+	entries := make([]Entry[V], len(o.entries))
+	copy(entries, o.entries)
 	return entries
 }
 
-// ForEach executes a function for each key-value pair in the ordered object.
-func (object *Object[V]) ForEach(fn func(key string, value V)) {
-	for i := range object.entries {
-		fn(object.entries[i].Key, object.entries[i].Value)
+// ForEach calls fn for each key-value pair in insertion order.
+func (o *Object[V]) ForEach(fn func(key string, value V)) {
+	for i := range o.entries {
+		fn(o.entries[i].Key, o.entries[i].Value)
 	}
 }
 
-// Clone returns a deep copy of the ordered object.
-func (object *Object[V]) Clone() *Object[V] {
-	entries := make([]Entry[V], len(object.entries))
-	copy(entries, object.entries)
+// Clone returns a shallow copy of the ordered object.
+func (o *Object[V]) Clone() *Object[V] {
+	entries := make([]Entry[V], len(o.entries))
+	copy(entries, o.entries)
 	return &Object[V]{entries: entries}
 }
 
 // MarshalJSON encodes the ordered object as JSON.
-func (object *Object[V]) MarshalJSON() ([]byte, error) {
+func (o *Object[V]) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	enc := jsontext.NewEncoder(&buf)
-	if err := object.MarshalJSONTo(enc); err != nil {
+	if err := o.MarshalJSONTo(enc); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
 // MarshalJSONTo encodes the ordered object to a JSON encoder.
-func (object *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
 		return err
 	}
-	for i := range object.entries {
-		if err := enc.WriteToken(jsontext.String(object.entries[i].Key)); err != nil {
+	for i := range o.entries {
+		if err := enc.WriteToken(jsontext.String(o.entries[i].Key)); err != nil {
 			return err
 		}
 
 		// Check if value implements OrderedMarshaler and handle it specially
-		if orderedMarshaler, ok := any(object.entries[i].Value).(OrderedMarshaler); ok {
-			if err := orderedMarshaler.MarshalJSONTo(enc); err != nil {
+		if m, ok := any(o.entries[i].Value).(OrderedMarshaler); ok {
+			if err := m.MarshalJSONTo(enc); err != nil {
 				return err
 			}
 		} else {
-			// Use Deterministic option to ensure nested maps have consistent ordering
-			if err := json.MarshalEncode(enc, object.entries[i].Value, json.Deterministic(true)); err != nil {
+			if err := json.MarshalEncode(enc, o.entries[i].Value, json.Deterministic(true)); err != nil {
 				return err
 			}
 		}
@@ -194,18 +193,18 @@ func (object *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 }
 
 // UnmarshalJSON decodes a JSON object into the ordered object.
-func (object *Object[V]) UnmarshalJSON(data []byte) error {
+func (o *Object[V]) UnmarshalJSON(data []byte) error {
 	dec := jsontext.NewDecoder(bytes.NewReader(data))
-	return object.UnmarshalJSONFrom(dec)
+	return o.UnmarshalJSONFrom(dec)
 }
 
 // UnmarshalJSONFrom decodes a JSON object from a decoder into the ordered object.
-func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	// Reset the object and clear old references for GC
-	clear(object.entries)
-	object.entries = object.entries[:0]
+func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	// Reset the object and clear old references for GC.
+	clear(o.entries)
+	o.entries = o.entries[:0]
 
-	// Check for object start
+	// Check for object start.
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return err
@@ -214,9 +213,8 @@ func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("%w, got %v", ErrExpectedObjectStart, tok.Kind())
 	}
 
-	// Parse key-value pairs
+	// Parse key-value pairs.
 	for dec.PeekKind() != '}' {
-		// Read key
 		tok, err := dec.ReadToken()
 		if err != nil {
 			return err
@@ -226,36 +224,30 @@ func (object *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		}
 		key := tok.String()
 
-		// Read value
 		var value V
 		if err := json.UnmarshalDecode(dec, &value); err != nil {
 			return err
 		}
 
-		// Add to entries
-		object.entries = append(object.entries, Entry[V]{Key: key, Value: value})
+		o.entries = append(o.entries, Entry[V]{Key: key, Value: value})
 	}
 
-	// Read the closing '}'
-	if _, err := dec.ReadToken(); err != nil {
-		return err
-	}
-
-	return nil
+	// Read the closing '}'.
+	_, err = dec.ReadToken()
+	return err
 }
 
 // ToMap converts the ordered object to a standard Go map.
-// The returned map will not preserve the insertion order.
-func (object *Object[V]) ToMap() map[string]V {
-	m := make(map[string]V, len(object.entries))
-	for _, entry := range object.entries {
+// The returned map does not preserve insertion order.
+func (o *Object[V]) ToMap() map[string]V {
+	m := make(map[string]V, len(o.entries))
+	for _, entry := range o.entries {
 		m[entry.Key] = entry.Value
 	}
 	return m
 }
 
 // ToJSON converts the ordered object to a JSON byte slice.
-// This is a convenience method that internally uses json.Marshal.
-func (object *Object[V]) ToJSON() ([]byte, error) {
-	return json.Marshal(object)
+func (o *Object[V]) ToJSON() ([]byte, error) {
+	return json.Marshal(o)
 }

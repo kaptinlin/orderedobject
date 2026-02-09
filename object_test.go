@@ -170,7 +170,7 @@ func TestDelete(t *testing.T) {
 
 	// Delete non-existent key shouldn't affect object
 	obj.Delete("missing")
-	assert.Equal(t, 2, obj.Length())
+	assert.Equal(t, 2, obj.Len())
 }
 
 func TestForEach(t *testing.T) {
@@ -206,18 +206,18 @@ func TestForEach(t *testing.T) {
 	assert.Equal(t, 3, value)
 }
 
-func TestLength(t *testing.T) {
+func TestLen(t *testing.T) {
 	t.Parallel()
 
 	obj := NewObject[any](0)
-	assert.Equal(t, 0, obj.Length())
+	assert.Equal(t, 0, obj.Len())
 
 	obj.Set("a", 1)
 	obj.Set("b", 2)
-	assert.Equal(t, 2, obj.Length())
+	assert.Equal(t, 2, obj.Len())
 
 	obj.Delete("a")
-	assert.Equal(t, 1, obj.Length())
+	assert.Equal(t, 1, obj.Len())
 }
 
 func TestChaining(t *testing.T) {
@@ -229,7 +229,7 @@ func TestChaining(t *testing.T) {
 		Set("b", 2).
 		Set("c", 3)
 
-	assert.Equal(t, 3, obj.Length())
+	assert.Equal(t, 3, obj.Len())
 
 	sum := 0
 	obj.ForEach(func(key string, value any) {
@@ -259,7 +259,7 @@ func TestFromMap(t *testing.T) {
 	}
 
 	// Check length
-	assert.Equal(t, len(m), obj.Length())
+	assert.Equal(t, len(m), obj.Len())
 }
 
 func TestFromJSON(t *testing.T) {
@@ -284,7 +284,7 @@ func TestFromJSON(t *testing.T) {
 	assert.Equal(t, "New York", city)
 
 	// Check length
-	assert.Equal(t, 3, obj.Length())
+	assert.Equal(t, 3, obj.Len())
 }
 
 func TestClone(t *testing.T) {
@@ -354,7 +354,7 @@ func TestCapacity(t *testing.T) {
 
 	// Verify initial state
 	assert.Equal(t, 3, cap(obj.entries))
-	assert.Equal(t, 0, obj.Length())
+	assert.Equal(t, 0, obj.Len())
 
 	// Add entries up to capacity
 	obj.Set("a", 1)
@@ -363,7 +363,7 @@ func TestCapacity(t *testing.T) {
 
 	// Verify state at capacity
 	assert.Equal(t, 3, cap(obj.entries))
-	assert.Equal(t, 3, obj.Length())
+	assert.Equal(t, 3, obj.Len())
 
 	// Add more entries beyond capacity
 	obj.Set("d", 4)
@@ -372,7 +372,7 @@ func TestCapacity(t *testing.T) {
 	obj.Set("g", 7)
 
 	// Verify state after exceeding capacity
-	assert.Equal(t, 7, obj.Length())
+	assert.Equal(t, 7, obj.Len())
 	assert.GreaterOrEqual(t, cap(obj.entries), 7)
 
 	// Verify all values are correct
