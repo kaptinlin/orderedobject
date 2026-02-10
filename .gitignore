@@ -30,6 +30,13 @@ Thumbs.db
 # Local binaries
 bin/
 
-
 # local
 *.local.json
+
+# .ralphy
+.ralphy/deferred.json
+.ralphy/*.txt
+
+# todo files
+.todo
+TODO.md

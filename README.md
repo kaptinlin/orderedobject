@@ -22,8 +22,9 @@ An ordered JSON object implementation that preserves insertion order, designed t
 - Preserves key insertion order when marshalling to JSON
 - Generic implementation that can store any type of value
 - Simple API with method chaining
-- Compatible with go-json-experiment/json
-- Rich set of constructors and utility methods
+- Deterministic map key ordering in JSON output
+- Nested ordered object support via `OrderedMarshaler` interface
+- Compatible with [go-json-experiment/json](https://github.com/go-json-experiment/json)
 
 ## Installation
 
@@ -165,39 +166,57 @@ if user, found := users.Get("user1"); found {
 
 ### Types
 
-- `Entry[V any]`: Represents a key-value pair
-- `Object[V any]`: An ordered collection of key-value pairs
+- `Entry[V any]` — A key-value pair with `Key string` and `Value V` fields
+- `Object[V any]` — An ordered collection of key-value pairs that preserves insertion order
+- `OrderedMarshaler` — Interface for types that marshal themselves to JSON while preserving key order
 
-### Functions
+### Sentinel Errors
 
-- `NewObject[V any](capacity ...int) *Object[V]`: Creates a new ordered object
-- `FromMap[V any](m map[string]V) *Object[V]`: Creates an ordered object from a map
-- `FromJSON[V any](data []byte) (*Object[V], error)`: Creates an ordered object from JSON
+- `ErrExpectedObjectStart` — Returned when the JSON token is not `{`
+- `ErrExpectedStringKey` — Returned when the JSON token is not a string key
+
+### Constructors
+
+- `NewObject[V any](capacity ...int) *Object[V]` — Creates a new ordered object with optional pre-allocated capacity
+- `FromMap[V any](m map[string]V) *Object[V]` — Creates an ordered object from a map (iteration order is non-deterministic)
+- `FromJSON[V any](data []byte) (*Object[V], error)` — Parses a JSON byte slice, preserving key order
 
 ### Methods
 
-- `Set(key string, value V) *Object[V]`: Sets a key-value pair
-- `Get(key string) (V, bool)`: Gets a value by key
-- `Has(key string) bool`: Checks if a key exists
-- `Delete(key string) *Object[V]`: Removes a key-value pair
-- `Length() int`: Returns the number of key-value pairs
-- `ForEach(fn func(key string, value V))`: Iterates through key-value pairs
-- `Clone() *Object[V]`: Creates a deep copy of the object
-- `Entries() []Entry[V]`: Returns all key-value pairs
-- `ToMap() map[string]V`: Converts to a standard Go map
-- `ToJSON() ([]byte, error)`: Converts to JSON
-- `MarshalJSON() ([]byte, error)`: Implements json.Marshaler
+- `Set(key string, value V) *Object[V]` — Sets a key-value pair; updates in place if the key exists
+- `Get(key string) (V, bool)` — Returns the value for a key and whether the key exists
+- `Has(key string) bool` — Reports whether the key exists
+- `Delete(key string) *Object[V]` — Removes a key-value pair; no-op if key does not exist
+- `Len() int` — Returns the number of key-value pairs
+- `Keys() []string` — Returns all keys in insertion order
+- `Values() []V` — Returns all values in insertion order
+- `Entries() []Entry[V]` — Returns a copy of all key-value pairs in insertion order
+- `ForEach(fn func(key string, value V))` — Calls fn for each key-value pair in insertion order
+- `Clone() *Object[V]` — Returns a shallow copy of the ordered object
+- `ToMap() map[string]V` — Converts to a standard Go map (order not preserved)
+- `ToJSON() ([]byte, error)` — Converts to JSON
+- `MarshalJSON() ([]byte, error)` — Implements `json.Marshaler`
+- `MarshalJSONTo(enc *jsontext.Encoder) error` — Encodes to a JSON encoder (implements `OrderedMarshaler`)
+- `UnmarshalJSON(data []byte) error` — Implements `json.Unmarshaler`
+- `UnmarshalJSONFrom(dec *jsontext.Decoder) error` — Decodes from a JSON decoder
 
 ## FAQ
 
-### Q: Why choose go-json-experiment/json over the standard library?
-A: go-json-experiment/json provides better performance and more features while maintaining compatibility with the standard library.
+### Why use go-json-experiment/json instead of encoding/json?
 
-### Q: Does it support custom JSON tags?
-A: Yes, it supports standard struct tags like `json:"field_name"`.
+go-json-experiment/json provides token-level streaming APIs (`jsontext.Encoder`/`jsontext.Decoder`) that enable efficient ordered marshalling without intermediate allocations. The standard library does not expose equivalent APIs.
 
-### Q: How does it handle key order?
-A: The library preserves the insertion order of keys when marshalling to JSON, unlike standard Go maps.
+### Does it support custom JSON tags?
+
+Yes. Values are marshalled using `go-json-experiment/json`, which supports standard struct tags like `json:"field_name"` and `json:",omitempty"`.
+
+### How does it handle nested ordered objects?
+
+When a value implements the `OrderedMarshaler` interface, key order is preserved recursively during marshalling. When parsing JSON via `FromJSON[any]`, nested objects are decoded as `map[string]any` (order not preserved at nested levels).
+
+### Are duplicate keys allowed?
+
+No. `FromJSON` rejects JSON input containing duplicate keys and returns an error.
 
 ## Contributing
 
