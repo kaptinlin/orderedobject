@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kaptinlin/orderedobject"
 )
@@ -44,13 +45,10 @@ func main() {
 }
 
 func printNestedObject(obj *orderedobject.Object[any], indent int) {
-	indentStr := ""
-	for i := 0; i < indent; i++ {
-		indentStr += "  "
-	}
+	prefix := strings.Repeat("  ", indent)
 
 	obj.ForEach(func(key string, value any) {
-		fmt.Printf("%s%s: ", indentStr, key)
+		fmt.Printf("%s%s: ", prefix, key)
 		if nested, ok := value.(*orderedobject.Object[any]); ok {
 			fmt.Println()
 			printNestedObject(nested, indent+1)

@@ -34,7 +34,7 @@ Single-file library (`object.go`) with one core type:
 
 ## Go Version
 
-Go 1.25. Uses `slices.Clone`, `slices.Delete`, `clear()`, `for range N`, `testing.B.Loop()`.
+Go 1.26. Uses `slices.Clone`, `slices.Delete`, `clear()`, `for range N`, `testing.B.Loop()`.
 
 ## Dependencies
 
@@ -49,4 +49,4 @@ Go 1.25. Uses `slices.Clone`, `slices.Delete`, `clear()`, `for range N`, `testin
 
 ## Lint
 
-golangci-lint version managed by `.golangci.version` file (currently v2.7.2 installed). Config in `.golangci.yml` if present, otherwise defaults.
+golangci-lint version managed by `.golangci.version` file (currently v2.9.0 installed). Config in `.golangci.yml` if present, otherwise defaults.
