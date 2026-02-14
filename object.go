@@ -38,12 +38,12 @@ type Object[V any] struct {
 
 // NewObject returns an ordered object with optional pre-allocated capacity.
 func NewObject[V any](capacity ...int) *Object[V] {
-	var n int
+	cap := 0
 	if len(capacity) > 0 {
-		n = capacity[0]
+		cap = capacity[0]
 	}
 	return &Object[V]{
-		entries: make([]Entry[V], 0, n),
+		entries: make([]Entry[V], 0, cap),
 	}
 }
 
@@ -238,8 +238,8 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // The returned map does not preserve insertion order.
 func (o *Object[V]) ToMap() map[string]V {
 	m := make(map[string]V, len(o.entries))
-	for _, entry := range o.entries {
-		m[entry.Key] = entry.Value
+	for i := range o.entries {
+		m[o.entries[i].Key] = o.entries[i].Value
 	}
 	return m
 }
