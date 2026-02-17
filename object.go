@@ -38,12 +38,12 @@ type Object[V any] struct {
 
 // NewObject returns an ordered object with optional pre-allocated capacity.
 func NewObject[V any](capacity ...int) *Object[V] {
-	cap := 0
+	n := 0
 	if len(capacity) > 0 {
-		cap = capacity[0]
+		n = capacity[0]
 	}
 	return &Object[V]{
-		entries: make([]Entry[V], 0, cap),
+		entries: make([]Entry[V], 0, n),
 	}
 }
 

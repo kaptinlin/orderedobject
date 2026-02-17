@@ -936,6 +936,7 @@ func BenchmarkObjectDelete(b *testing.B) {
 	b.ResetTimer()
 	for b.Loop() {
 		obj.Delete("key50")
+		obj.Set("key50", 50) // Re-insert so next iteration deletes a real key.
 	}
 }
 
