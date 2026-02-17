@@ -59,15 +59,15 @@ func TestMarshal(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := json.Marshal(tc.obj)
+			got, err := json.Marshal(tt.obj)
 			if err != nil {
 				t.Fatalf("json.Marshal() returned unexpected error: %v", err)
 			}
-			if string(got) != tc.want {
-				t.Errorf("json.Marshal() = %q, want %q", string(got), tc.want)
+			if string(got) != tt.want {
+				t.Errorf("json.Marshal() = %q, want %q", string(got), tt.want)
 			}
 		})
 	}
@@ -93,15 +93,15 @@ func TestGet(t *testing.T) {
 		{name: "non-existent key", key: "missing", wantValue: nil, wantFound: false},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, found := obj.Get(tc.key)
-			if found != tc.wantFound {
-				t.Errorf("Get(%q) found = %v, want %v", tc.key, found, tc.wantFound)
+			got, found := obj.Get(tt.key)
+			if found != tt.wantFound {
+				t.Errorf("Get(%q) found = %v, want %v", tt.key, found, tt.wantFound)
 			}
-			if got != tc.wantValue {
-				t.Errorf("Get(%q) = %v, want %v", tc.key, got, tc.wantValue)
+			if got != tt.wantValue {
+				t.Errorf("Get(%q) = %v, want %v", tt.key, got, tt.wantValue)
 			}
 		})
 	}
@@ -252,15 +252,15 @@ func TestFromJSON(t *testing.T) {
 		{key: "age", want: float64(30)},
 		{key: "city", want: "New York"},
 	}
-	for _, tc := range tests {
-		t.Run(tc.key, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
 			t.Parallel()
-			got, found := obj.Get(tc.key)
+			got, found := obj.Get(tt.key)
 			if !found {
-				t.Fatalf("Get(%q) not found", tc.key)
+				t.Fatalf("Get(%q) not found", tt.key)
 			}
-			if got != tc.want {
-				t.Errorf("Get(%q) = %v, want %v", tc.key, got, tc.want)
+			if got != tt.want {
+				t.Errorf("Get(%q) = %v, want %v", tt.key, got, tt.want)
 			}
 		})
 	}
@@ -400,10 +400,10 @@ func TestJSONRoundtrip(t *testing.T) {
 		{name: "object with null values", json: `{"a":null,"b":null}`},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			obj, err := FromJSON[any]([]byte(tc.json))
+			obj, err := FromJSON[any]([]byte(tt.json))
 			if err != nil {
 				t.Fatalf("FromJSON() returned unexpected error: %v", err)
 			}
@@ -412,8 +412,8 @@ func TestJSONRoundtrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("json.Marshal() returned unexpected error: %v", err)
 			}
-			if string(got) != tc.json {
-				t.Errorf("roundtrip = %q, want %q", string(got), tc.json)
+			if string(got) != tt.json {
+				t.Errorf("roundtrip = %q, want %q", string(got), tt.json)
 			}
 		})
 	}
@@ -518,16 +518,16 @@ func TestJSONTags(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			obj := NewObject[testStruct](1).Set("user", tc.input)
+			obj := NewObject[testStruct](1).Set("user", tt.input)
 
 			got, err := json.Marshal(obj)
 			if err != nil {
 				t.Fatalf("json.Marshal() returned unexpected error: %v", err)
 			}
-			want := `{"user":` + tc.want + `}`
+			want := `{"user":` + tt.want + `}`
 			if string(got) != want {
 				t.Errorf("json.Marshal() = %q, want %q", string(got), want)
 			}
@@ -544,7 +544,7 @@ func TestJSONTags(t *testing.T) {
 				t.Fatalf("decoded.Get(\"user\") not found")
 			}
 			// IsActive is tagged json:"-", so it should be zero after decode.
-			expected := tc.input
+			expected := tt.input
 			expected.IsActive = false
 			if val != expected {
 				t.Errorf("decoded.Get(\"user\") = %v, want %v", val, expected)
@@ -619,15 +619,15 @@ func TestToJSON(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := tc.obj.ToJSON()
+			got, err := tt.obj.ToJSON()
 			if err != nil {
 				t.Fatalf("ToJSON() returned unexpected error: %v", err)
 			}
-			if string(got) != tc.want {
-				t.Errorf("ToJSON() = %q, want %q", string(got), tc.want)
+			if string(got) != tt.want {
+				t.Errorf("ToJSON() = %q, want %q", string(got), tt.want)
 			}
 		})
 	}
@@ -683,16 +683,16 @@ func TestFromJSON_Errors(t *testing.T) {
 		{name: "empty input", input: ``},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := FromJSON[any]([]byte(tc.input))
+			_, err := FromJSON[any]([]byte(tt.input))
 			if err == nil {
 				t.Fatal("FromJSON() should return error")
 			}
-			if tc.wantError != nil {
-				if !errors.Is(err, tc.wantError) {
-					t.Errorf("expected error %v, got %v", tc.wantError, err)
+			if tt.wantError != nil {
+				if !errors.Is(err, tt.wantError) {
+					t.Errorf("expected error %v, got %v", tt.wantError, err)
 				}
 			}
 		})
@@ -829,16 +829,16 @@ func TestUnmarshalJSONFrom_NotAnObject(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var obj Object[any]
-			err := obj.UnmarshalJSON([]byte(tc.input))
+			err := obj.UnmarshalJSON([]byte(tt.input))
 			if err == nil {
 				t.Fatal("UnmarshalJSON() should return error")
 			}
-			if !errors.Is(err, tc.wantError) {
-				t.Errorf("expected error %v, got %v", tc.wantError, err)
+			if !errors.Is(err, tt.wantError) {
+				t.Errorf("expected error %v, got %v", tt.wantError, err)
 			}
 		})
 	}

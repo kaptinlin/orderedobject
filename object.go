@@ -48,7 +48,7 @@ func NewObject[V any](capacity ...int) *Object[V] {
 }
 
 // FromMap creates an ordered object from a map.
-// The order of the keys will be determined by the map iteration order.
+// Key order is determined by Go's map iteration order, which is randomized.
 func FromMap[V any](m map[string]V) *Object[V] {
 	obj := NewObject[V](len(m))
 	for k, v := range m {
@@ -57,8 +57,9 @@ func FromMap[V any](m map[string]V) *Object[V] {
 	return obj
 }
 
-// FromJSON parses a JSON byte slice into an ordered object.
-// The order of keys is preserved as they appear in the JSON input.
+// FromJSON parses JSON data into an ordered object.
+// Key order is preserved as it appears in the JSON input.
+// Returns an error if data is not valid JSON or not an object.
 func FromJSON[V any](data []byte) (*Object[V], error) {
 	obj := NewObject[V]()
 	if err := obj.UnmarshalJSON(data); err != nil {
@@ -74,10 +75,10 @@ func (o *Object[V]) findKeyIndex(key string) int {
 	})
 }
 
-// Set sets the value for a key in the ordered object.
-// If the key already exists, its value is updated in place.
-// Otherwise, the key-value pair is appended to the end.
-// Returns the object for method chaining.
+// Set associates value with key in the ordered object.
+// If key already exists, its value is updated in place without changing position.
+// If key is new, the key-value pair is appended to the end.
+// Returns the object to enable method chaining.
 func (o *Object[V]) Set(key string, value V) *Object[V] {
 	if idx := o.findKeyIndex(key); idx >= 0 {
 		o.entries[idx].Value = value
@@ -87,8 +88,9 @@ func (o *Object[V]) Set(key string, value V) *Object[V] {
 	return o
 }
 
-// Get returns the value for a key and whether the key exists.
-// If the key does not exist, it returns the zero value and false.
+// Get returns the value associated with key and a boolean indicating whether
+// the key was found. If the key does not exist, returns the zero value for V
+// and false.
 func (o *Object[V]) Get(key string) (V, bool) {
 	if idx := o.findKeyIndex(key); idx >= 0 {
 		return o.entries[idx].Value, true
@@ -102,9 +104,9 @@ func (o *Object[V]) Has(key string) bool {
 	return o.findKeyIndex(key) >= 0
 }
 
-// Delete removes a key-value pair from the ordered object.
-// If the key does not exist, it is a no-op.
-// Returns the object for method chaining.
+// Delete removes the key-value pair associated with key from the ordered object.
+// If key does not exist, this is a no-op.
+// Returns the object to enable method chaining.
 func (o *Object[V]) Delete(key string) *Object[V] {
 	if idx := o.findKeyIndex(key); idx >= 0 {
 		o.entries = slices.Delete(o.entries, idx, idx+1)
@@ -204,7 +206,7 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return err
 	}
 	if tok.Kind() != '{' {
-		return fmt.Errorf("%w, got %v", ErrExpectedObjectStart, tok.Kind())
+		return fmt.Errorf("expected object start '{', got %v: %w", tok.Kind(), ErrExpectedObjectStart)
 	}
 
 	// Parse key-value pairs.
@@ -214,7 +216,7 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 			return err
 		}
 		if tok.Kind() != '"' {
-			return fmt.Errorf("%w, got %v", ErrExpectedStringKey, tok.Kind())
+			return fmt.Errorf("expected string key, got %v: %w", tok.Kind(), ErrExpectedStringKey)
 		}
 		key := tok.String()
 
