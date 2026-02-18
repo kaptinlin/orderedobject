@@ -7,12 +7,12 @@
 ## Build Commands
 
 ```bash
-make test       # Run all tests
-make lint       # Run golangci-lint and go mod tidy check
+task test       # Run all tests
+task lint       # Run golangci-lint and go mod tidy check
 make fmt        # Format code
 make vet        # Run go vet
-make verify     # Run all: deps, fmt, vet, lint, test
-make clean      # Remove build artifacts and caches
+task verify     # Run all: deps, fmt, vet, lint, test
+task clean      # Remove build artifacts and caches
 ```
 
 ## Architecture
