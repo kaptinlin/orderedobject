@@ -198,10 +198,12 @@ func TestKeysValuesEntries(t *testing.T) {
 		wantValues := []int{1, 2, 3}
 		wantEntries := []Entry[int]{{Key: "a", Value: 1}, {Key: "b", Value: 2}, {Key: "c", Value: 3}}
 
-		if diff := cmp.Diff(wantKeys, obj.Keys()); diff != "" {
+		gotKeys := obj.Keys()
+		if diff := cmp.Diff(wantKeys, gotKeys); diff != "" {
 			t.Errorf("Keys() mismatch (-want +got):\n%s", diff)
 		}
-		if diff := cmp.Diff(wantValues, obj.Values()); diff != "" {
+		gotValues := obj.Values()
+		if diff := cmp.Diff(wantValues, gotValues); diff != "" {
 			t.Errorf("Values() mismatch (-want +got):\n%s", diff)
 		}
 		gotEntries := obj.Entries()
@@ -209,7 +211,16 @@ func TestKeysValuesEntries(t *testing.T) {
 			t.Errorf("Entries() mismatch (-want +got):\n%s", diff)
 		}
 
+		gotKeys[0] = "x"
+		gotValues[0] = 99
 		gotEntries[0] = Entry[int]{Key: "x", Value: 99}
+
+		if diff := cmp.Diff(wantKeys, obj.Keys()); diff != "" {
+			t.Errorf("Keys() leaked mutation (-want +got):\n%s", diff)
+		}
+		if diff := cmp.Diff(wantValues, obj.Values()); diff != "" {
+			t.Errorf("Values() leaked mutation (-want +got):\n%s", diff)
+		}
 		if diff := cmp.Diff(wantEntries, obj.Entries()); diff != "" {
 			t.Errorf("Entries() leaked mutation (-want +got):\n%s", diff)
 		}
