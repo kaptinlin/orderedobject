@@ -9,7 +9,6 @@ import (
 func main() {
 	fmt.Println("=== Type Safety Example ===")
 
-	// Define types
 	type User struct {
 		Name  string
 		Age   int
@@ -21,7 +20,6 @@ func main() {
 		Active bool
 	}
 
-	// Create type-safe objects
 	users := orderedobject.NewObject[User]().
 		Set("user1", User{Name: "Alice", Age: 30, Email: "alice@example.com"}).
 		Set("user2", User{Name: "Bob", Age: 25, Email: "bob@example.com"})
@@ -30,7 +28,6 @@ func main() {
 		Set("default", Settings{Theme: "light", Active: true}).
 		Set("custom", Settings{Theme: "dark", Active: false})
 
-	// Access typed values
 	if user, found := users.Get("user1"); found {
 		fmt.Printf("\nUser: %s, Age: %d\n", user.Name, user.Age)
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -580,10 +581,34 @@ func TestUnmarshalJSON(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("returns unexpected eof for trailing tokens", func(t *testing.T) {
+		t.Parallel()
+
+		var obj Object[any]
+		err := obj.UnmarshalJSON([]byte(`{"ok":1} true`))
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("errors.Is(%v, io.ErrUnexpectedEOF) = false", err)
+		}
+	})
 }
 
 func TestUnmarshalJSONFrom(t *testing.T) {
 	t.Parallel()
+
+	t.Run("returns ErrExpectedStringKey for invalid key", func(t *testing.T) {
+		t.Parallel()
+
+		dec := jsontext.NewDecoder(strings.NewReader(`{1:"value"}`))
+		var obj Object[any]
+		err := obj.UnmarshalJSONFrom(dec)
+		if err == nil {
+			t.Fatal("UnmarshalJSONFrom() error = nil, want non-nil")
+		}
+		if !errors.Is(err, ErrExpectedStringKey) {
+			t.Fatalf("errors.Is(%v, ErrExpectedStringKey) = false", err)
+		}
+	})
 
 	t.Run("decodes into typed object", func(t *testing.T) {
 		t.Parallel()

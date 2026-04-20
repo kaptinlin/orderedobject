@@ -9,7 +9,6 @@ import (
 func main() {
 	fmt.Println("=== Map Operations Example ===")
 
-	// Create from map
 	settings := map[string]any{
 		"theme":         "dark",
 		"font_size":     14,
@@ -23,10 +22,8 @@ func main() {
 		fmt.Printf("  %s: %v\n", key, value)
 	})
 
-	// Convert back to map
-	m := obj.ToMap()
 	fmt.Println("\nBack to map (order not preserved):")
-	for k, v := range m {
+	for k, v := range obj.ToMap() {
 		fmt.Printf("  %s: %v\n", k, v)
 	}
 }

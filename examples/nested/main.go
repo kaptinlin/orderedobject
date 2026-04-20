@@ -10,7 +10,6 @@ import (
 func main() {
 	fmt.Println("=== Nested Structures Example ===")
 
-	// Create a nested configuration
 	config := orderedobject.NewObject[any]().
 		Set("app", orderedobject.NewObject[any]().
 			Set("name", "MyApp").
@@ -30,7 +29,6 @@ func main() {
 				Set("username", "admin").
 				Set("password", "secret")))
 
-	// Access nested values
 	if app, found := config.Get("app"); found {
 		if appObj, ok := app.(*orderedobject.Object[any]); ok {
 			if name, found := appObj.Get("name"); found {
@@ -39,7 +37,6 @@ func main() {
 		}
 	}
 
-	// Print nested structure
 	fmt.Println("\nFull configuration:")
 	printNestedObject(config, 0)
 }

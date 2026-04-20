@@ -10,14 +10,12 @@ import (
 func main() {
 	fmt.Println("=== JSON Operations Example ===")
 
-	// Create object
 	user := orderedobject.NewObject[any]().
 		Set("id", 1001).
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
 		Set("active", true)
 
-	// Convert to JSON (three ways)
 	fmt.Println("\n1. Using ToJSON:")
 	data1, _ := user.ToJSON()
 	fmt.Println(string(data1))
@@ -27,11 +25,9 @@ func main() {
 	fmt.Println(string(data2))
 
 	fmt.Println("\n3. Via map (order not preserved):")
-	m := user.ToMap()
-	data3, _ := jsonlib.Marshal(m)
+	data3, _ := jsonlib.Marshal(user.ToMap())
 	fmt.Println(string(data3))
 
-	// Parse JSON
 	jsonStr := `{"name":"Alice","age":30,"skills":["Go","Python"]}`
 	parsed, _ := orderedobject.FromJSON[any]([]byte(jsonStr))
 	fmt.Println("\nParsed JSON:")

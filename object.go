@@ -196,13 +196,30 @@ func (o *Object[V]) UnmarshalJSON(data []byte) error {
 	}
 
 	_, err := dec.ReadToken()
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
+	switch {
+	case errors.Is(err, io.EOF):
+		return nil
+	case err != nil:
 		return err
+	default:
+		return io.ErrUnexpectedEOF
 	}
-	return io.ErrUnexpectedEOF
+}
+
+func readObjectKey(dec *jsontext.Decoder) (string, error) {
+	kind := dec.PeekKind()
+	if kind == '"' {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return "", err
+		}
+		return tok.String(), nil
+	}
+	if kind == 0 {
+		_, err := dec.ReadToken()
+		return "", err
+	}
+	return "", fmt.Errorf("expected string key, got %v: %w", kind, ErrExpectedStringKey)
 }
 
 // UnmarshalJSONFrom decodes a JSON object from a decoder into the ordered object.
@@ -219,18 +236,10 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	}
 
 	for dec.PeekKind() != '}' {
-		if kind := dec.PeekKind(); kind != '"' && kind != 0 {
-			return fmt.Errorf("expected string key, got %v: %w", kind, ErrExpectedStringKey)
-		}
-
-		tok, err := dec.ReadToken()
+		key, err := readObjectKey(dec)
 		if err != nil {
 			return err
 		}
-		if tok.Kind() != '"' {
-			return fmt.Errorf("expected string key, got %v: %w", tok.Kind(), ErrExpectedStringKey)
-		}
-		key := tok.String()
 
 		var value V
 		if err := json.UnmarshalDecode(dec, &value); err != nil {
