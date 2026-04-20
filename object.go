@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 
 	json "github.com/go-json-experiment/json"
@@ -174,7 +175,6 @@ func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 			return err
 		}
 
-		// Preserve key order for nested ordered objects.
 		if m, ok := any(entry.Value).(OrderedMarshaler); ok {
 			if err := m.MarshalJSONTo(enc); err != nil {
 				return err
@@ -191,16 +191,25 @@ func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 // UnmarshalJSON decodes a JSON object into the ordered object.
 func (o *Object[V]) UnmarshalJSON(data []byte) error {
 	dec := jsontext.NewDecoder(bytes.NewReader(data))
-	return o.UnmarshalJSONFrom(dec)
+	if err := o.UnmarshalJSONFrom(dec); err != nil {
+		return err
+	}
+
+	_, err := dec.ReadToken()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
+	return io.ErrUnexpectedEOF
 }
 
 // UnmarshalJSONFrom decodes a JSON object from a decoder into the ordered object.
 func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	// Reset the object and clear old references for GC.
 	clear(o.entries)
 	o.entries = o.entries[:0]
 
-	// Check for object start.
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return err
@@ -209,8 +218,11 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("expected object start '{', got %v: %w", tok.Kind(), ErrExpectedObjectStart)
 	}
 
-	// Parse key-value pairs.
 	for dec.PeekKind() != '}' {
+		if kind := dec.PeekKind(); kind != '"' && kind != 0 {
+			return fmt.Errorf("expected string key, got %v: %w", kind, ErrExpectedStringKey)
+		}
+
 		tok, err := dec.ReadToken()
 		if err != nil {
 			return err
@@ -228,7 +240,6 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		o.entries = append(o.entries, Entry[V]{Key: key, Value: value})
 	}
 
-	// Read the closing '}'.
 	_, err = dec.ReadToken()
 	return err
 }
