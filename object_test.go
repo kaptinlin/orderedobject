@@ -142,6 +142,35 @@ func TestSetGetHasDeleteLen(t *testing.T) {
 	}
 }
 
+func TestEmptyStringKey(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[int]().Set("", 1).Set("named", 2)
+
+	if got, found := obj.Get(""); !found || got != 1 {
+		t.Fatalf("Get(\"\") = (%v, %v), want (1, true)", got, found)
+	}
+	if !obj.Has("") {
+		t.Fatal("Has(\"\") = false, want true")
+	}
+
+	obj.Set("", 3)
+	if diff := cmp.Diff([]string{"", "named"}, obj.Keys()); diff != "" {
+		t.Errorf("Keys() after empty-key update mismatch (-want +got):\n%s", diff)
+	}
+	if got, found := obj.Get(""); !found || got != 3 {
+		t.Fatalf("Get(\"\") after update = (%v, %v), want (3, true)", got, found)
+	}
+
+	obj.Delete("")
+	if obj.Has("") {
+		t.Fatal("Has(\"\") = true after Delete")
+	}
+	if diff := cmp.Diff([]string{"named"}, obj.Keys()); diff != "" {
+		t.Errorf("Keys() after empty-key Delete mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestKeysValuesEntries(t *testing.T) {
 	t.Parallel()
 
