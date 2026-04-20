@@ -2,51 +2,29 @@
 
 ## Project Overview
 
-`orderedobject` is a generic ordered JSON object for Go that preserves insertion order of keys. It uses [go-json-experiment/json](https://github.com/go-json-experiment/json) (experimental encoding/json v2) for token-level streaming marshal/unmarshal.
+`orderedobject` is a generic ordered JSON object for Go that preserves insertion order of keys.
 
-## Build Commands
+## Commands
 
 ```bash
-task test       # Run all tests
-task lint       # Run golangci-lint and go mod tidy check
-make fmt        # Format code
-make vet        # Run go vet
-task verify     # Run all: deps, fmt, vet, lint, test
-task clean      # Remove build artifacts and caches
+task test         # Run all tests with race detection
+task lint         # Run golangci-lint and the tidy check
+task fmt          # Format Go code
+task vet          # Run go vet
+task verify       # Run deps, fmt, vet, lint, test, and vuln
+task markdownlint # Lint Markdown files
+task clean        # Remove build artifacts and caches
 ```
 
-## Architecture
+## SPECS Index
 
-Single-file library (`object.go`) with one core type:
+- `SPECS/00-overview.md` — package scope and non-goals
+- `SPECS/10-domain-specs.md` — core types, invariants, and JSON rules
+- `SPECS/40-architecture-specs.md` — storage model and JSON pipeline
+- `SPECS/50-coding-standards.md` — testing, lint, and documentation rules
 
-- `Object[V any]` — ordered key-value store backed by `[]Entry[V]`
-- Key lookup is linear scan (`findKeyIndex`); suitable for small-to-medium objects
-- JSON marshalling uses `jsontext.Encoder` streaming API for zero-intermediate-allocation output
-- Nested order preservation via `OrderedMarshaler` interface (checked with type assertion)
-- Map values use `json.Deterministic(true)` for sorted key output
+## Working Rules
 
-## Key Design Decisions
-
-- **No map index**: Linear scan over entries slice, not a parallel `map[string]int`. Keeps the implementation simple and correct for typical JSON object sizes.
-- **Shallow clone**: `Clone()` copies the entries slice but not the values themselves.
-- **Duplicate key rejection**: `FromJSON` relies on `go-json-experiment/json` default behavior which rejects duplicate keys.
-- **Clear on unmarshal**: `UnmarshalJSONFrom` clears existing entries before decoding, using `clear()` for proper GC of old references.
-
-## Go Version
-
-Go 1.26. Uses `slices.Clone`, `slices.Delete`, `clear()`, `for range N`, `testing.B.Loop()`.
-
-## Dependencies
-
-- `github.com/go-json-experiment/json` — JSON v2 experimental library (encoder/decoder/marshal)
-
-## Testing
-
-- All tests use `t.Parallel()`
-- Standard library assertions only (no testify)
-- Benchmarks use `b.Loop()` (Go 1.24+)
-- Run with race detector: `go test -race ./...`
-
-## Lint
-
-golangci-lint version managed by `.golangci.version` file (currently v2.9.0 installed). Config in `.golangci.yml` if present, otherwise defaults.
+- Treat `SPECS/` as the canonical home for normative design rules.
+- Keep `README.md` focused on usage and examples.
+- Run `task lint` and `task test` before finishing a change.
