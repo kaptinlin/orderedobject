@@ -207,6 +207,50 @@ func TestForEach(t *testing.T) {
 	}
 }
 
+func TestLargeValueOperations(t *testing.T) {
+	t.Parallel()
+
+	type largeValue struct {
+		Name    string
+		Payload [64]int
+	}
+
+	want := largeValue{Name: "alpha"}
+	for i := range want.Payload {
+		want.Payload[i] = i + 1
+	}
+
+	obj := NewObject[largeValue]().Set("first", want)
+
+	got, found := obj.Get("first")
+	if !found {
+		t.Fatal("Get(\"first\") not found")
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("Get(\"first\") mismatch (-want +got):\n%s", diff)
+	}
+	if !obj.Has("first") {
+		t.Fatal("Has(\"first\") = false, want true")
+	}
+
+	if diff := cmp.Diff([]largeValue{want}, obj.Values()); diff != "" {
+		t.Errorf("Values() mismatch (-want +got):\n%s", diff)
+	}
+
+	var gotEntries []Entry[largeValue]
+	obj.ForEach(func(key string, value largeValue) {
+		gotEntries = append(gotEntries, Entry[largeValue]{Key: key, Value: value})
+	})
+	wantEntries := []Entry[largeValue]{{Key: "first", Value: want}}
+	if diff := cmp.Diff(wantEntries, gotEntries); diff != "" {
+		t.Errorf("ForEach() mismatch (-want +got):\n%s", diff)
+	}
+
+	if diff := cmp.Diff(map[string]largeValue{"first": want}, obj.ToMap()); diff != "" {
+		t.Errorf("ToMap() mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestClone(t *testing.T) {
 	t.Parallel()
 
