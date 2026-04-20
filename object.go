@@ -52,7 +52,7 @@ func NewObject[V any](capacity ...int) *Object[V] {
 func FromMap[V any](m map[string]V) *Object[V] {
 	obj := NewObject[V](len(m))
 	for k, v := range m {
-		obj.Set(k, v)
+		obj.entries = append(obj.entries, Entry[V]{Key: k, Value: v})
 	}
 	return obj
 }

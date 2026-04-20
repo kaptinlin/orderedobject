@@ -192,6 +192,22 @@ func TestFromMap(t *testing.T) {
 	}
 }
 
+func TestFromMap_DoesNotAliasInputMap(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]int{"count": 1}
+	obj := FromMap(m)
+	m["count"] = 2
+
+	got, found := obj.Get("count")
+	if !found {
+		t.Fatal("Get(\"count\") should be found")
+	}
+	if got != 1 {
+		t.Fatalf("Get(\"count\") = %d, want 1", got)
+	}
+}
+
 func TestFromJSON(t *testing.T) {
 	t.Parallel()
 
