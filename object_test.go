@@ -256,12 +256,17 @@ func TestLargeValueOperations(t *testing.T) {
 		Payload [64]int
 	}
 
-	want := largeValue{Name: "alpha"}
-	for i := range want.Payload {
-		want.Payload[i] = i + 1
+	newLargeValue := func(name string, base int) largeValue {
+		value := largeValue{Name: name}
+		for i := range value.Payload {
+			value.Payload[i] = base + i
+		}
+		return value
 	}
 
-	obj := NewObject[largeValue]().Set("first", want)
+	want := newLargeValue("alpha", 1)
+	second := newLargeValue("beta", 100)
+	obj := NewObject[largeValue]().Set("first", want).Set("second", second)
 
 	got, found := obj.Get("first")
 	if !found {
@@ -273,8 +278,32 @@ func TestLargeValueOperations(t *testing.T) {
 	if !obj.Has("first") {
 		t.Fatal("Has(\"first\") = false, want true")
 	}
+	if obj.Has("missing") {
+		t.Fatal("Has(\"missing\") = true, want false")
+	}
 
-	if diff := cmp.Diff([]largeValue{want}, obj.Values()); diff != "" {
+	updated := newLargeValue("alpha-updated", 1000)
+	obj.Set("first", updated)
+	if diff := cmp.Diff([]string{"first", "second"}, obj.Keys()); diff != "" {
+		t.Errorf("Keys() after large-value update mismatch (-want +got):\n%s", diff)
+	}
+	got, found = obj.Get("first")
+	if !found {
+		t.Fatal("Get(\"first\") after update not found")
+	}
+	if diff := cmp.Diff(updated, got); diff != "" {
+		t.Fatalf("Get(\"first\") after update mismatch (-want +got):\n%s", diff)
+	}
+
+	obj.Delete("first")
+	if obj.Has("first") {
+		t.Fatal("Has(\"first\") = true after Delete")
+	}
+	if diff := cmp.Diff([]string{"second"}, obj.Keys()); diff != "" {
+		t.Errorf("Keys() after Delete mismatch (-want +got):\n%s", diff)
+	}
+
+	if diff := cmp.Diff([]largeValue{second}, obj.Values()); diff != "" {
 		t.Errorf("Values() mismatch (-want +got):\n%s", diff)
 	}
 
@@ -282,12 +311,12 @@ func TestLargeValueOperations(t *testing.T) {
 	obj.ForEach(func(key string, value largeValue) {
 		gotEntries = append(gotEntries, Entry[largeValue]{Key: key, Value: value})
 	})
-	wantEntries := []Entry[largeValue]{{Key: "first", Value: want}}
+	wantEntries := []Entry[largeValue]{{Key: "second", Value: second}}
 	if diff := cmp.Diff(wantEntries, gotEntries); diff != "" {
 		t.Errorf("ForEach() mismatch (-want +got):\n%s", diff)
 	}
 
-	if diff := cmp.Diff(map[string]largeValue{"first": want}, obj.ToMap()); diff != "" {
+	if diff := cmp.Diff(map[string]largeValue{"second": second}, obj.ToMap()); diff != "" {
 		t.Errorf("ToMap() mismatch (-want +got):\n%s", diff)
 	}
 }
