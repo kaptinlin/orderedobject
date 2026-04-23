@@ -505,6 +505,57 @@ func TestOrderedMarshalerInterface(t *testing.T) {
 	}
 }
 
+func TestMarshalJSONPreservesDeterministicNestedMapOrdering(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[any]().Set("fruits", map[string]any{
+		"zebra":  1,
+		"apple":  2,
+		"mango":  3,
+		"banana": 4,
+	})
+
+	marshalJSON := func(t *testing.T) string {
+		t.Helper()
+
+		data, err := obj.MarshalJSON()
+		if err != nil {
+			t.Fatalf("MarshalJSON() error = %v", err)
+		}
+		return string(data)
+	}
+	toJSON := func(t *testing.T) string {
+		t.Helper()
+
+		data, err := obj.ToJSON()
+		if err != nil {
+			t.Fatalf("ToJSON() error = %v", err)
+		}
+		return string(data)
+	}
+
+	firstMarshalJSON := marshalJSON(t)
+	firstToJSON := toJSON(t)
+	if firstMarshalJSON != firstToJSON+"\n" {
+		t.Fatalf("MarshalJSON() = %q, want %q", firstMarshalJSON, firstToJSON+"\n")
+	}
+
+	for range 5 {
+		if got := marshalJSON(t); got != firstMarshalJSON {
+			t.Fatalf("MarshalJSON() changed nested map order: got %q, want %q", got, firstMarshalJSON)
+		}
+		if got := toJSON(t); got != firstToJSON {
+			t.Fatalf("ToJSON() changed nested map order: got %q, want %q", got, firstToJSON)
+		}
+	}
+
+	if strings.Index(firstToJSON, `"apple"`) >= strings.Index(firstToJSON, `"banana"`) ||
+		strings.Index(firstToJSON, `"banana"`) >= strings.Index(firstToJSON, `"mango"`) ||
+		strings.Index(firstToJSON, `"mango"`) >= strings.Index(firstToJSON, `"zebra"`) {
+		t.Fatalf("nested map keys were not sorted deterministically: %q", firstToJSON)
+	}
+}
+
 func TestFromJSON(t *testing.T) {
 	t.Parallel()
 
@@ -794,7 +845,6 @@ func TestJSONTags(t *testing.T) {
 
 func BenchmarkObjectSet(b *testing.B) {
 	obj := NewObject[any](100)
-	b.ResetTimer()
 	for b.Loop() {
 		obj.Set("key", 42)
 	}
@@ -805,7 +855,6 @@ func BenchmarkObjectGet(b *testing.B) {
 	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
-	b.ResetTimer()
 	for b.Loop() {
 		obj.Get("key50")
 	}
@@ -816,7 +865,6 @@ func BenchmarkObjectHas(b *testing.B) {
 	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
-	b.ResetTimer()
 	for b.Loop() {
 		obj.Has("key50")
 	}
@@ -827,7 +875,6 @@ func BenchmarkObjectDelete(b *testing.B) {
 	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
-	b.ResetTimer()
 	for b.Loop() {
 		obj.Delete("key50")
 		obj.Set("key50", 50)
@@ -840,7 +887,6 @@ func BenchmarkObjectMarshalJSON(b *testing.B) {
 		Set("age", 30).
 		Set("city", "New York").
 		Set("active", true)
-	b.ResetTimer()
 	for b.Loop() {
 		_, _ = obj.MarshalJSON()
 	}
