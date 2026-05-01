@@ -1,18 +1,16 @@
 package main
 
 import (
-	"bytes"
-	"io"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/kaptinlin/orderedobject"
+	"github.com/kaptinlin/orderedobject/internal/testutil"
 )
 
 func TestMainOutput(t *testing.T) {
 	// os.Stdout is process-wide.
-	got := captureOutput(t, main)
+	got := testutil.CaptureOutput(t, main)
 	want := `=== Error Handling Example ===
 
 Successfully parsed JSON
@@ -29,7 +27,7 @@ Server port: 8080
 func TestPrintConfigReportsParseError(t *testing.T) {
 	// os.Stdout is process-wide.
 	var config *orderedobject.Object[any]
-	got := captureOutput(t, func() {
+	got := testutil.CaptureOutput(t, func() {
 		config = printConfig(`[`)
 	})
 	if !strings.HasPrefix(got, "\nParse error: ") {
@@ -43,7 +41,7 @@ func TestPrintConfigReportsParseError(t *testing.T) {
 func TestPrintPortReportsNumber(t *testing.T) {
 	// os.Stdout is process-wide.
 	config := orderedobject.NewObject[any]().Set("port", float64(8080))
-	got := captureOutput(t, func() {
+	got := testutil.CaptureOutput(t, func() {
 		printPort(config)
 	})
 	want := "Port number: 8080\n"
@@ -55,7 +53,7 @@ func TestPrintPortReportsNumber(t *testing.T) {
 func TestPrintLookupReportsFoundValue(t *testing.T) {
 	// os.Stdout is process-wide.
 	config := orderedobject.NewObject[any]().Set("answer", 42)
-	got := captureOutput(t, func() {
+	got := testutil.CaptureOutput(t, func() {
 		printLookup(config, "answer")
 	})
 	want := "Found value: 42\n"
@@ -66,7 +64,7 @@ func TestPrintLookupReportsFoundValue(t *testing.T) {
 
 func TestPrintServerPortReportsMissingServer(t *testing.T) {
 	// os.Stdout is process-wide.
-	got := captureOutput(t, func() {
+	got := testutil.CaptureOutput(t, func() {
 		printServerPort(orderedobject.NewObject[any]())
 	})
 	want := "server configuration not found\n"
@@ -78,38 +76,11 @@ func TestPrintServerPortReportsMissingServer(t *testing.T) {
 func TestPrintServerPortReportsWrongType(t *testing.T) {
 	// os.Stdout is process-wide.
 	config := orderedobject.NewObject[any]().Set("server", "localhost")
-	got := captureOutput(t, func() {
+	got := testutil.CaptureOutput(t, func() {
 		printServerPort(config)
 	})
 	want := "server is not an object type\n"
 	if got != want {
 		t.Fatalf("printServerPort() output = %q, want %q", got, want)
 	}
-}
-
-func captureOutput(t *testing.T, fn func()) string {
-	t.Helper()
-
-	original := os.Stdout
-	read, write, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe() error = %v", err)
-	}
-	os.Stdout = write
-
-	fn()
-
-	if err := write.Close(); err != nil {
-		t.Fatalf("stdout pipe close error = %v", err)
-	}
-	os.Stdout = original
-
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, read); err != nil {
-		t.Fatalf("stdout pipe read error = %v", err)
-	}
-	if err := read.Close(); err != nil {
-		t.Fatalf("stdout pipe read close error = %v", err)
-	}
-	return buf.String()
 }

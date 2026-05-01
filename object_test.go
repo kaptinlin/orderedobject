@@ -440,6 +440,19 @@ func TestMarshalJSONAndToJSON(t *testing.T) {
 	}
 }
 
+func assertSubstringsInOrder(t *testing.T, s string, substrings []string) {
+	t.Helper()
+
+	previous := -1
+	for _, substring := range substrings {
+		idx := strings.Index(s, substring)
+		if idx <= previous {
+			t.Fatalf("%q is not ordered by %v", s, substrings)
+		}
+		previous = idx
+	}
+}
+
 func TestMarshalJSONTo(t *testing.T) {
 	t.Parallel()
 
@@ -470,11 +483,7 @@ func TestMarshalJSONTo(t *testing.T) {
 			}
 		}
 
-		if strings.Index(first, `"apple"`) >= strings.Index(first, `"banana"`) ||
-			strings.Index(first, `"banana"`) >= strings.Index(first, `"mango"`) ||
-			strings.Index(first, `"mango"`) >= strings.Index(first, `"zebra"`) {
-			t.Fatalf("MarshalJSONTo() did not sort nested map keys: %q", first)
-		}
+		assertSubstringsInOrder(t, first, []string{`"apple"`, `"banana"`, `"mango"`, `"zebra"`})
 	})
 
 	t.Run("returns error for unmarshalable value", func(t *testing.T) {
@@ -568,11 +577,7 @@ func TestMarshalJSONPreservesDeterministicNestedMapOrdering(t *testing.T) {
 		}
 	}
 
-	if strings.Index(firstToJSON, `"apple"`) >= strings.Index(firstToJSON, `"banana"`) ||
-		strings.Index(firstToJSON, `"banana"`) >= strings.Index(firstToJSON, `"mango"`) ||
-		strings.Index(firstToJSON, `"mango"`) >= strings.Index(firstToJSON, `"zebra"`) {
-		t.Fatalf("nested map keys were not sorted deterministically: %q", firstToJSON)
-	}
+	assertSubstringsInOrder(t, firstToJSON, []string{`"apple"`, `"banana"`, `"mango"`, `"zebra"`})
 }
 
 func TestFromJSON(t *testing.T) {
@@ -606,11 +611,7 @@ func TestFromJSON(t *testing.T) {
 
 		entries := obj.Entries()
 		wantTopLevelKeys := []string{"settings", "version"}
-		gotTopLevelKeys := make([]string, 0, len(entries))
-		for _, entry := range entries {
-			gotTopLevelKeys = append(gotTopLevelKeys, entry.Key)
-		}
-		if diff := cmp.Diff(wantTopLevelKeys, gotTopLevelKeys); diff != "" {
+		if diff := cmp.Diff(wantTopLevelKeys, obj.Keys()); diff != "" {
 			t.Errorf("top-level keys mismatch (-want +got):\n%s", diff)
 		}
 
@@ -766,8 +767,8 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadToken() error = %v", err)
 		}
-		if tok.Kind() != 't' {
-			t.Fatalf("next token kind = %q, want %q", tok.Kind(), 't')
+		if tok.Kind() != jsontext.KindTrue {
+			t.Fatalf("next token kind = %q, want %q", tok.Kind(), jsontext.KindTrue)
 		}
 	})
 }

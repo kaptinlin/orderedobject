@@ -32,13 +32,19 @@ func main() {
 	app, found := config.Get("app")
 	appObj, ok := app.(*orderedobject.Object[any])
 	if found && ok {
-		if name, found := appObj.Get("name"); found {
-			fmt.Printf("\nApp name: %v\n", name)
-		}
+		printAppName(appObj)
 	}
 
 	fmt.Println("\nFull configuration:")
 	printNestedObject(config, 0)
+}
+
+func printAppName(appObj *orderedobject.Object[any]) {
+	name, found := appObj.Get("name")
+	if !found {
+		return
+	}
+	fmt.Printf("\nApp name: %v\n", name)
 }
 
 func printNestedObject(obj *orderedobject.Object[any], indent int) {

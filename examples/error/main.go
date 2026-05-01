@@ -30,21 +30,25 @@ func printConfig(data string) *orderedobject.Object[any] {
 }
 
 func printPort(config *orderedobject.Object[any]) {
-	if port, found := config.Get("port"); found {
-		if portInt, ok := port.(float64); ok {
-			fmt.Printf("Port number: %d\n", int(portInt))
-		} else {
-			fmt.Printf("Port type error: %T\n", port)
-		}
+	port, found := config.Get("port")
+	if !found {
+		return
 	}
+	portInt, ok := port.(float64)
+	if !ok {
+		fmt.Printf("Port type error: %T\n", port)
+		return
+	}
+	fmt.Printf("Port number: %d\n", int(portInt))
 }
 
 func printLookup(config *orderedobject.Object[any], key string) {
-	if value, found := config.Get(key); found {
-		fmt.Printf("Found value: %v\n", value)
-	} else {
+	value, found := config.Get(key)
+	if !found {
 		fmt.Printf("Key '%s' does not exist\n", key)
+		return
 	}
+	fmt.Printf("Found value: %v\n", value)
 }
 
 func printServerPort(nestedConfig *orderedobject.Object[any]) {

@@ -28,23 +28,29 @@ func main() {
 
 	settings, found := config.Get("settings")
 	settingsArray, ok := settings.([]any)
-	if found && ok {
-		fmt.Println("\nSettings:")
-		for i, setting := range settingsArray {
-			settingObj, ok := setting.(*orderedobject.Object[any])
-			if !ok {
-				continue
-			}
-			name, found := settingObj.Get("name")
-			if !found {
-				continue
-			}
-			value, found := settingObj.Get("value")
-			if !found {
-				continue
-			}
-			fmt.Printf("  %d. %s = %v\n", i+1, name, value)
+	if !found || !ok {
+		fmt.Println("\nAll values:")
+		config.ForEach(func(key string, value any) {
+			fmt.Printf("  %s: %v\n", key, value)
+		})
+		return
+	}
+
+	fmt.Println("\nSettings:")
+	for i, setting := range settingsArray {
+		settingObj, ok := setting.(*orderedobject.Object[any])
+		if !ok {
+			continue
 		}
+		name, found := settingObj.Get("name")
+		if !found {
+			continue
+		}
+		value, found := settingObj.Get("value")
+		if !found {
+			continue
+		}
+		fmt.Printf("  %d. %s = %v\n", i+1, name, value)
 	}
 
 	fmt.Println("\nAll values:")
