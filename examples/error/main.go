@@ -9,15 +9,27 @@ import (
 func main() {
 	fmt.Println("=== Error Handling Example ===")
 
-	invalidJSON := `{"name": "test", "port": "not_a_number"}`
-	config, err := orderedobject.FromJSON[any]([]byte(invalidJSON))
+	config := printConfig(`{"name": "test", "port": "not_a_number"}`)
+	printPort(config)
+	printLookup(config, "nonexistent")
+
+	nestedConfig := orderedobject.NewObject[any]().
+		Set("server", orderedobject.NewObject[any]().
+			Set("port", 8080))
+	printServerPort(nestedConfig)
+}
+
+func printConfig(data string) *orderedobject.Object[any] {
+	config, err := orderedobject.FromJSON[any]([]byte(data))
 	if err != nil {
 		fmt.Printf("\nParse error: %v\n", err)
-		config = orderedobject.NewObject[any]()
-	} else {
-		fmt.Println("\nSuccessfully parsed JSON")
+		return orderedobject.NewObject[any]()
 	}
+	fmt.Println("\nSuccessfully parsed JSON")
+	return config
+}
 
+func printPort(config *orderedobject.Object[any]) {
 	if port, found := config.Get("port"); found {
 		if portInt, ok := port.(float64); ok {
 			fmt.Printf("Port number: %d\n", int(portInt))
@@ -25,17 +37,17 @@ func main() {
 			fmt.Printf("Port type error: %T\n", port)
 		}
 	}
+}
 
-	if value, found := config.Get("nonexistent"); found {
+func printLookup(config *orderedobject.Object[any], key string) {
+	if value, found := config.Get(key); found {
 		fmt.Printf("Found value: %v\n", value)
 	} else {
-		fmt.Println("Key 'nonexistent' does not exist")
+		fmt.Printf("Key '%s' does not exist\n", key)
 	}
+}
 
-	nestedConfig := orderedobject.NewObject[any]().
-		Set("server", orderedobject.NewObject[any]().
-			Set("port", 8080))
-
+func printServerPort(nestedConfig *orderedobject.Object[any]) {
 	server, found := nestedConfig.Get("server")
 	if !found {
 		fmt.Println("server configuration not found")
