@@ -21,30 +21,29 @@ func main() {
 				Set("value", 200),
 		})
 
-	if tags, found := config.Get("tags"); found {
-		if tagArray, ok := tags.([]string); ok {
-			fmt.Printf("\nTags: %v\n", tagArray)
-		}
+	tags, found := config.Get("tags")
+	if tagArray, ok := tags.([]string); found && ok {
+		fmt.Printf("\nTags: %v\n", tagArray)
 	}
 
-	if settings, found := config.Get("settings"); found {
-		if settingsArray, ok := settings.([]any); ok {
-			fmt.Println("\nSettings:")
-			for i, setting := range settingsArray {
-				settingObj, ok := setting.(*orderedobject.Object[any])
-				if !ok {
-					continue
-				}
-				name, found := settingObj.Get("name")
-				if !found {
-					continue
-				}
-				value, found := settingObj.Get("value")
-				if !found {
-					continue
-				}
-				fmt.Printf("  %d. %s = %v\n", i+1, name, value)
+	settings, found := config.Get("settings")
+	settingsArray, ok := settings.([]any)
+	if found && ok {
+		fmt.Println("\nSettings:")
+		for i, setting := range settingsArray {
+			settingObj, ok := setting.(*orderedobject.Object[any])
+			if !ok {
+				continue
 			}
+			name, found := settingObj.Get("name")
+			if !found {
+				continue
+			}
+			value, found := settingObj.Get("value")
+			if !found {
+				continue
+			}
+			fmt.Printf("  %d. %s = %v\n", i+1, name, value)
 		}
 	}
 

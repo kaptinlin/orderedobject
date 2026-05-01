@@ -71,8 +71,8 @@ func FromJSON[V any](data []byte) (*Object[V], error) {
 }
 
 func (o *Object[V]) findKeyIndex(key string) int {
-	for i, entry := range o.entries {
-		if entry.Key == key {
+	for i := range o.entries {
+		if o.entries[i].Key == key {
 			return i
 		}
 	}

@@ -17,7 +17,7 @@ func main() {
 	}
 
 	obj := orderedobject.FromMap(settings)
-	fmt.Println("\nFrom map (order preserved):")
+	fmt.Println("\nFrom map (order follows Go map iteration):")
 	obj.ForEach(func(key string, value any) {
 		fmt.Printf("  %s: %v\n", key, value)
 	})

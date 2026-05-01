@@ -14,7 +14,7 @@ func TestMainOutput(t *testing.T) {
 
 	required := []string{
 		"=== Map Operations Example ===\n",
-		"\nFrom map (order preserved):\n",
+		"\nFrom map (order follows Go map iteration):\n",
 		"\nBack to map (order not preserved):\n",
 		"  theme: dark\n",
 		"  font_size: 14\n",

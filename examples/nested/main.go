@@ -29,11 +29,11 @@ func main() {
 				Set("username", "admin").
 				Set("password", "secret")))
 
-	if app, found := config.Get("app"); found {
-		if appObj, ok := app.(*orderedobject.Object[any]); ok {
-			if name, found := appObj.Get("name"); found {
-				fmt.Printf("\nApp name: %v\n", name)
-			}
+	app, found := config.Get("app")
+	appObj, ok := app.(*orderedobject.Object[any])
+	if found && ok {
+		if name, found := appObj.Get("name"); found {
+			fmt.Printf("\nApp name: %v\n", name)
 		}
 	}
 
