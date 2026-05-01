@@ -71,8 +71,8 @@ func FromJSON[V any](data []byte) (*Object[V], error) {
 }
 
 func (o *Object[V]) findKeyIndex(key string) int {
-	for i := range o.entries {
-		if o.entries[i].Key == key {
+	for i, entry := range o.entries {
+		if entry.Key == key {
 			return i
 		}
 	}
@@ -122,8 +122,8 @@ func (o *Object[V]) Len() int {
 // Keys returns a new slice of keys in insertion order.
 func (o *Object[V]) Keys() []string {
 	keys := make([]string, len(o.entries))
-	for i := range o.entries {
-		keys[i] = o.entries[i].Key
+	for i, entry := range o.entries {
+		keys[i] = entry.Key
 	}
 	return keys
 }
@@ -131,8 +131,8 @@ func (o *Object[V]) Keys() []string {
 // Values returns a new slice of values in insertion order.
 func (o *Object[V]) Values() []V {
 	values := make([]V, len(o.entries))
-	for i := range o.entries {
-		values[i] = o.entries[i].Value
+	for i, entry := range o.entries {
+		values[i] = entry.Value
 	}
 	return values
 }
@@ -144,8 +144,8 @@ func (o *Object[V]) Entries() []Entry[V] {
 
 // ForEach calls fn for each entry in insertion order.
 func (o *Object[V]) ForEach(fn func(key string, value V)) {
-	for i := range o.entries {
-		fn(o.entries[i].Key, o.entries[i].Value)
+	for _, entry := range o.entries {
+		fn(entry.Key, entry.Value)
 	}
 }
 
@@ -170,18 +170,18 @@ func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
 		return err
 	}
-	for i := range o.entries {
-		if err := enc.WriteToken(jsontext.String(o.entries[i].Key)); err != nil {
+	for _, entry := range o.entries {
+		if err := enc.WriteToken(jsontext.String(entry.Key)); err != nil {
 			return err
 		}
 
-		if m, ok := any(o.entries[i].Value).(OrderedMarshaler); ok {
-			if err := m.MarshalJSONTo(enc); err != nil {
+		if marshaler, ok := any(entry.Value).(OrderedMarshaler); ok {
+			if err := marshaler.MarshalJSONTo(enc); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := json.MarshalEncode(enc, o.entries[i].Value, json.Deterministic(true)); err != nil {
+		if err := json.MarshalEncode(enc, entry.Value, json.Deterministic(true)); err != nil {
 			return err
 		}
 	}
@@ -208,18 +208,19 @@ func (o *Object[V]) UnmarshalJSON(data []byte) error {
 
 func readObjectKey(dec *jsontext.Decoder) (string, error) {
 	kind := dec.PeekKind()
-	if kind == '"' {
-		tok, err := dec.ReadToken()
-		if err != nil {
-			return "", err
-		}
-		return tok.String(), nil
-	}
 	if kind == 0 {
 		_, err := dec.ReadToken()
 		return "", err
 	}
-	return "", fmt.Errorf("expected string key, got %v: %w", kind, ErrExpectedStringKey)
+	if kind != '"' {
+		return "", fmt.Errorf("expected string key, got %v: %w", kind, ErrExpectedStringKey)
+	}
+
+	tok, err := dec.ReadToken()
+	if err != nil {
+		return "", err
+	}
+	return tok.String(), nil
 }
 
 // UnmarshalJSONFrom decodes a JSON object from dec into o.
@@ -258,8 +259,8 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // The returned map does not preserve insertion order.
 func (o *Object[V]) ToMap() map[string]V {
 	m := make(map[string]V, len(o.entries))
-	for i := range o.entries {
-		m[o.entries[i].Key] = o.entries[i].Value
+	for _, entry := range o.entries {
+		m[entry.Key] = entry.Value
 	}
 	return m
 }

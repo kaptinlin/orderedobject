@@ -487,6 +487,25 @@ func TestMarshalJSONTo(t *testing.T) {
 			t.Fatal("MarshalJSONTo() error = nil, want non-nil")
 		}
 	})
+
+	t.Run("returns ordered marshaler error", func(t *testing.T) {
+		t.Parallel()
+
+		obj := NewObject[any]().Set("broken", failingMarshaler{})
+		var buf bytes.Buffer
+		enc := jsontext.NewEncoder(&buf)
+		if err := obj.MarshalJSONTo(enc); !errors.Is(err, errFailingMarshaler) {
+			t.Fatalf("errors.Is(%v, errFailingMarshaler) = false", err)
+		}
+	})
+}
+
+var errFailingMarshaler = errors.New("failing marshaler")
+
+type failingMarshaler struct{}
+
+func (failingMarshaler) MarshalJSONTo(*jsontext.Encoder) error {
+	return errFailingMarshaler
 }
 
 func TestOrderedMarshalerInterface(t *testing.T) {
@@ -698,6 +717,16 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 		}
 		if !errors.Is(err, ErrExpectedStringKey) {
 			t.Fatalf("errors.Is(%v, ErrExpectedStringKey) = false", err)
+		}
+	})
+
+	t.Run("returns decoder error for truncated object before key", func(t *testing.T) {
+		t.Parallel()
+
+		dec := jsontext.NewDecoder(strings.NewReader(`{"ok":1,`))
+		var obj Object[any]
+		if err := obj.UnmarshalJSONFrom(dec); err == nil {
+			t.Fatal("UnmarshalJSONFrom() error = nil, want non-nil")
 		}
 	})
 
