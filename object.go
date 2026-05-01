@@ -71,12 +71,9 @@ func FromJSON[V any](data []byte) (*Object[V], error) {
 }
 
 func (o *Object[V]) findKeyIndex(key string) int {
-	for i := range o.entries {
-		if o.entries[i].Key == key {
-			return i
-		}
-	}
-	return -1
+	return slices.IndexFunc(o.entries, func(entry Entry[V]) bool {
+		return entry.Key == key
+	})
 }
 
 // Set stores value under key and returns o.
