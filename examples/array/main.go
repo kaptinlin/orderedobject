@@ -21,6 +21,10 @@ func main() {
 				Set("value", 200),
 		})
 
+	printArrayConfig(config)
+}
+
+func printArrayConfig(config *orderedobject.Object[any]) {
 	tags, found := config.Get("tags")
 	if tagArray, ok := tags.([]string); found && ok {
 		fmt.Printf("\nTags: %v\n", tagArray)

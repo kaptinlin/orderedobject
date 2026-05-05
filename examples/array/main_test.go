@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kaptinlin/orderedobject"
 	"github.com/kaptinlin/orderedobject/internal/testutil"
 )
 
@@ -24,5 +25,50 @@ All values:
   settings: [`
 	if !strings.HasPrefix(got, wantPrefix) {
 		t.Fatalf("main() output = %q, want prefix %q", got, wantPrefix)
+	}
+}
+
+func TestPrintArrayConfigFallsBackWhenSettingsIsMissing(t *testing.T) {
+	// os.Stdout is process-wide.
+	config := orderedobject.NewObject[any]().
+		Set("tags", []string{"go"}).
+		Set("numbers", []int{1, 2})
+
+	got := testutil.CaptureOutput(t, func() {
+		printArrayConfig(config)
+	})
+	want := `
+Tags: [go]
+
+All values:
+  tags: [go]
+  numbers: [1 2]
+`
+	if got != want {
+		t.Fatalf("printArrayConfig() output = %q, want %q", got, want)
+	}
+}
+
+func TestPrintArrayConfigSkipsInvalidSettings(t *testing.T) {
+	// os.Stdout is process-wide.
+	config := orderedobject.NewObject[any]().
+		Set("settings", []any{
+			"not an object",
+			orderedobject.NewObject[any]().Set("value", 100),
+			orderedobject.NewObject[any]().Set("name", "missing value"),
+			orderedobject.NewObject[any]().Set("name", "valid").Set("value", 200),
+		})
+
+	got := testutil.CaptureOutput(t, func() {
+		printArrayConfig(config)
+	})
+	wantPrefix := `
+Settings:
+  4. valid = 200
+
+All values:
+  settings: [not an object `
+	if !strings.HasPrefix(got, wantPrefix) {
+		t.Fatalf("printArrayConfig() output = %q, want prefix %q", got, wantPrefix)
 	}
 }
