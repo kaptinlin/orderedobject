@@ -533,6 +533,16 @@ func TestOrderedMarshalerInterface(t *testing.T) {
 	}
 }
 
+func TestMarshalJSONReturnsOrderedMarshalerError(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[any]().Set("broken", failingMarshaler{})
+	_, err := obj.MarshalJSON()
+	if !errors.Is(err, errFailingMarshaler) {
+		t.Fatalf("errors.Is(%v, errFailingMarshaler) = false", err)
+	}
+}
+
 func TestMarshalJSONPreservesDeterministicNestedMapOrdering(t *testing.T) {
 	t.Parallel()
 

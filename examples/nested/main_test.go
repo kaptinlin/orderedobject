@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/kaptinlin/orderedobject"
 	"github.com/kaptinlin/orderedobject/internal/testutil"
 )
 
@@ -34,5 +35,15 @@ database:
 `
 	if got != want {
 		t.Fatalf("main() output = %q, want %q", got, want)
+	}
+}
+
+func TestPrintAppNameSkipsMissingName(t *testing.T) {
+	// os.Stdout is process-wide.
+	got := testutil.CaptureOutput(t, func() {
+		printAppName(orderedobject.NewObject[any]())
+	})
+	if got != "" {
+		t.Fatalf("printAppName() output = %q, want empty", got)
 	}
 }

@@ -50,6 +50,16 @@ func TestPrintPortReportsNumber(t *testing.T) {
 	}
 }
 
+func TestPrintPortSkipsMissingPort(t *testing.T) {
+	// os.Stdout is process-wide.
+	got := testutil.CaptureOutput(t, func() {
+		printPort(orderedobject.NewObject[any]())
+	})
+	if got != "" {
+		t.Fatalf("printPort() output = %q, want empty", got)
+	}
+}
+
 func TestPrintLookupReportsFoundValue(t *testing.T) {
 	// os.Stdout is process-wide.
 	config := orderedobject.NewObject[any]().Set("answer", 42)
@@ -82,5 +92,16 @@ func TestPrintServerPortReportsWrongType(t *testing.T) {
 	want := "server is not an object type\n"
 	if got != want {
 		t.Fatalf("printServerPort() output = %q, want %q", got, want)
+	}
+}
+
+func TestPrintServerPortSkipsMissingPort(t *testing.T) {
+	// os.Stdout is process-wide.
+	config := orderedobject.NewObject[any]().Set("server", orderedobject.NewObject[any]())
+	got := testutil.CaptureOutput(t, func() {
+		printServerPort(config)
+	})
+	if got != "" {
+		t.Fatalf("printServerPort() output = %q, want empty", got)
 	}
 }
