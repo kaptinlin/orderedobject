@@ -1,3 +1,4 @@
+// Package main demonstrates basic orderedobject operations.
 package main
 
 import (

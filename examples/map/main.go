@@ -1,3 +1,4 @@
+// Package main demonstrates map conversion with orderedobject.
 package main
 
 import (

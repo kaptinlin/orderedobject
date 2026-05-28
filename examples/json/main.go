@@ -1,9 +1,11 @@
+// Package main demonstrates JSON encoding and decoding with orderedobject.
 package main
 
 import (
 	"fmt"
 
 	jsonlib "github.com/go-json-experiment/json"
+
 	"github.com/kaptinlin/orderedobject"
 )
 

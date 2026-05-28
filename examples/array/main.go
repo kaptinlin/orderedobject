@@ -1,3 +1,4 @@
+// Package main demonstrates slices of ordered objects.
 package main
 
 import (

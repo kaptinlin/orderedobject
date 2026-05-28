@@ -1,3 +1,4 @@
+// Package main demonstrates orderedobject error handling.
 package main
 
 import (

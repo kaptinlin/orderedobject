@@ -65,7 +65,7 @@ Before changing behavior, tests, or docs, read the relevant `SPECS/` files first
 
 ### Must Follow
 
-- Go 1.26.2 — use modern standard-library helpers when they simplify code.
+- Use the Go version declared in `go.mod`; use modern standard-library helpers when they simplify code.
 - Read the relevant `SPECS/` documents before changing behavior or docs.
 - Use `t.Parallel()` when a test case is safe to run concurrently.
 - Use focused subtests and `cmp.Diff` for structural comparisons.

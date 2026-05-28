@@ -1,3 +1,4 @@
+// Package main demonstrates nested ordered objects.
 package main
 
 import (

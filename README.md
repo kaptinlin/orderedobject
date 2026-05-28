@@ -13,7 +13,7 @@ A generic ordered JSON object for Go that preserves insertion order during mutat
 
 ## Installation
 
-Requires Go 1.26+.
+Requires the Go version declared in `go.mod`.
 
 ```bash
 go get github.com/kaptinlin/orderedobject
@@ -115,7 +115,7 @@ task test
 task lint
 ```
 
-For development guidelines, see [AGENTS.md](AGENTS.md).
+For development guidelines, see [CLAUDE.md](CLAUDE.md).
 
 ## Contributing
 

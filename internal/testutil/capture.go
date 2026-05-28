@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// CaptureOutput runs fn with stdout captured and returns the captured output.
 func CaptureOutput(t *testing.T, fn func()) string {
 	t.Helper()
 

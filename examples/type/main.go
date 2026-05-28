@@ -1,3 +1,4 @@
+// Package main demonstrates concrete value types with orderedobject.
 package main
 
 import (
