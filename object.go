@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"slices"
 
 	json "github.com/go-json-experiment/json"
@@ -144,8 +145,8 @@ func (o *Object[V]) Entries() []Entry[V] {
 
 // ForEach calls fn for each entry in insertion order.
 func (o *Object[V]) ForEach(fn func(key string, value V)) {
-	for i := range o.entries {
-		fn(o.entries[i].Key, o.entries[i].Value)
+	for _, entry := range slices.Clone(o.entries) {
+		fn(entry.Key, entry.Value)
 	}
 }
 
@@ -177,6 +178,12 @@ func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 		}
 
 		if marshaler, ok := any(entry.Value).(OrderedMarshaler); ok {
+			if isNilOrderedMarshaler(marshaler) {
+				if err := enc.WriteToken(jsontext.Null); err != nil {
+					return err
+				}
+				continue
+			}
 			if err := marshaler.MarshalJSONTo(enc); err != nil {
 				return err
 			}
@@ -205,6 +212,11 @@ func (o *Object[V]) UnmarshalJSON(data []byte) error {
 	default:
 		return io.ErrUnexpectedEOF
 	}
+}
+
+func isNilOrderedMarshaler(marshaler OrderedMarshaler) bool {
+	v := reflect.ValueOf(marshaler)
+	return v.Kind() == reflect.Pointer && v.IsNil()
 }
 
 func readObjectKey(dec *jsontext.Decoder) (string, error) {
@@ -242,6 +254,10 @@ func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		key, err := readObjectKey(dec)
 		if err != nil {
 			return err
+		}
+
+		if o.findKeyIndex(key) >= 0 {
+			return fmt.Errorf("duplicate key %q", key)
 		}
 
 		var value V

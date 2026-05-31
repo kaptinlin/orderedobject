@@ -248,6 +248,25 @@ func TestForEach(t *testing.T) {
 	}
 }
 
+func TestForEachToleratesMutation(t *testing.T) {
+	t.Parallel()
+
+	obj := NewObject[int]().Set("a", 1).Set("b", 2).Set("c", 3)
+	var gotKeys []string
+
+	obj.ForEach(func(key string, value int) {
+		gotKeys = append(gotKeys, key)
+		obj.Delete(key)
+	})
+
+	if diff := cmp.Diff([]string{"a", "b", "c"}, gotKeys); diff != "" {
+		t.Errorf("ForEach keys mismatch (-want +got):\n%s", diff)
+	}
+	if got := obj.Len(); got != 0 {
+		t.Fatalf("Len() after callback deletes = %d, want 0", got)
+	}
+}
+
 func TestLargeValueOperations(t *testing.T) {
 	t.Parallel()
 
@@ -543,6 +562,29 @@ func TestMarshalJSONReturnsOrderedMarshalerError(t *testing.T) {
 	}
 }
 
+func TestMarshalJSONEncodesNilOrderedMarshalerAsNull(t *testing.T) {
+	t.Parallel()
+
+	var child *Object[any]
+	obj := NewObject[any]().Set("child", child)
+
+	got, err := obj.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON() error = %v", err)
+	}
+	if string(got) != `{"child":null}`+"\n" {
+		t.Fatalf("MarshalJSON() = %q, want %q", got, `{"child":null}`+"\n")
+	}
+
+	toJSON, err := obj.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() error = %v", err)
+	}
+	if string(toJSON) != `{"child":null}` {
+		t.Fatalf("ToJSON() = %q, want %q", toJSON, `{"child":null}`)
+	}
+}
+
 func TestMarshalJSONPreservesDeterministicNestedMapOrdering(t *testing.T) {
 	t.Parallel()
 
@@ -761,6 +803,16 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 		}
 		if diff := cmp.Diff(want, obj.Entries()); diff != "" {
 			t.Errorf("Entries() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("rejects duplicate keys with permissive decoder", func(t *testing.T) {
+		t.Parallel()
+
+		dec := jsontext.NewDecoder(strings.NewReader(`{"key":"first","key":"second"}`), jsontext.AllowDuplicateNames(true))
+		var obj Object[any]
+		if err := obj.UnmarshalJSONFrom(dec); err == nil {
+			t.Fatal("UnmarshalJSONFrom() error = nil, want non-nil")
 		}
 	})
 
