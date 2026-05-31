@@ -42,9 +42,9 @@ type Object[V any] struct {
 
 // NewObject returns an Object with optional initial capacity.
 func NewObject[V any](capacity ...int) *Object[V] {
-	n := 0
+	var n int
 	if len(capacity) > 0 {
-		n = capacity[0]
+		n = max(capacity[0], 0)
 	}
 	return &Object[V]{
 		entries: make([]Entry[V], 0, n),
@@ -203,14 +203,14 @@ func (o *Object[V]) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	_, err := dec.ReadToken()
+	tok, err := dec.ReadToken()
 	switch {
 	case errors.Is(err, io.EOF):
 		return nil
 	case err != nil:
 		return err
 	default:
-		return io.ErrUnexpectedEOF
+		return fmt.Errorf("unexpected trailing token %v: %w", tok.Kind(), io.ErrUnexpectedEOF)
 	}
 }
 

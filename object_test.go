@@ -44,6 +44,20 @@ func TestNewObject(t *testing.T) {
 			t.Errorf("Keys() mismatch (-want +got):\n%s", diff)
 		}
 	})
+
+	t.Run("with negative capacity", func(t *testing.T) {
+		t.Parallel()
+
+		obj := NewObject[int](-1)
+		if got := obj.Len(); got != 0 {
+			t.Fatalf("Len() = %d, want 0", got)
+		}
+
+		obj.Set("a", 1)
+		if got := obj.Len(); got != 1 {
+			t.Fatalf("Len() after Set = %d, want 1", got)
+		}
+	})
 }
 
 func TestFromMap(t *testing.T) {
@@ -753,6 +767,9 @@ func TestUnmarshalJSON(t *testing.T) {
 		if !errors.Is(err, io.ErrUnexpectedEOF) {
 			t.Fatalf("errors.Is(%v, io.ErrUnexpectedEOF) = false", err)
 		}
+		if !strings.Contains(err.Error(), "unexpected trailing token true") {
+			t.Fatalf("UnmarshalJSON() error = %q, want trailing token context", err)
+		}
 	})
 }
 
@@ -980,6 +997,8 @@ func BenchmarkObjectMarshalJSON(b *testing.B) {
 		Set("city", "New York").
 		Set("active", true)
 	for b.Loop() {
-		_, _ = obj.MarshalJSON()
+		if _, err := obj.MarshalJSON(); err != nil {
+			b.Fatalf("MarshalJSON() error = %v", err)
+		}
 	}
 }
