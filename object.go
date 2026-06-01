@@ -241,35 +241,42 @@ func readObjectKey(dec *jsontext.Decoder) (string, error) {
 func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	clear(o.entries)
 	o.entries = o.entries[:0]
+	fail := func(err error) error {
+		clear(o.entries)
+		o.entries = o.entries[:0]
+		return err
+	}
 
 	tok, err := dec.ReadToken()
 	if err != nil {
-		return err
+		return fail(err)
 	}
 	if tok.Kind() != jsontext.KindBeginObject {
-		return fmt.Errorf("expected object start '{', got %v: %w", tok.Kind(), ErrExpectedObjectStart)
+		return fail(fmt.Errorf("expected object start '{', got %v: %w", tok.Kind(), ErrExpectedObjectStart))
 	}
 
 	for dec.PeekKind() != jsontext.KindEndObject {
 		key, err := readObjectKey(dec)
 		if err != nil {
-			return err
+			return fail(err)
 		}
 
 		if o.findKeyIndex(key) >= 0 {
-			return fmt.Errorf("duplicate key %q", key)
+			return fail(fmt.Errorf("duplicate key %q", key))
 		}
 
 		var value V
 		if err := json.UnmarshalDecode(dec, &value); err != nil {
-			return err
+			return fail(err)
 		}
 
 		o.entries = append(o.entries, Entry[V]{Key: key, Value: value})
 	}
 
-	_, err = dec.ReadToken()
-	return err
+	if _, err = dec.ReadToken(); err != nil {
+		return fail(err)
+	}
+	return nil
 }
 
 // ToMap returns a new map containing o's entries.

@@ -800,6 +800,20 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 		}
 	})
 
+	t.Run("clears entries before malformed replacement", func(t *testing.T) {
+		t.Parallel()
+
+		dec := jsontext.NewDecoder(strings.NewReader(`{"new":1,`))
+		obj := NewObject[any]().Set("old", "data")
+
+		if err := obj.UnmarshalJSONFrom(dec); err == nil {
+			t.Fatal("UnmarshalJSONFrom() error = nil, want non-nil")
+		}
+		if got := obj.Len(); got != 0 {
+			t.Fatalf("Len() after malformed replacement = %d, want 0", got)
+		}
+	})
+
 	t.Run("decodes into typed object", func(t *testing.T) {
 		t.Parallel()
 
