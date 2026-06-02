@@ -203,14 +203,20 @@ func (o *Object[V]) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	fail := func(err error) error {
+		clear(o.entries)
+		o.entries = o.entries[:0]
+		return err
+	}
+
 	tok, err := dec.ReadToken()
 	switch {
 	case errors.Is(err, io.EOF):
 		return nil
 	case err != nil:
-		return err
+		return fail(err)
 	default:
-		return fmt.Errorf("unexpected trailing token %v: %w", tok.Kind(), io.ErrUnexpectedEOF)
+		return fail(fmt.Errorf("unexpected trailing token %v: %w", tok.Kind(), io.ErrUnexpectedEOF))
 	}
 }
 

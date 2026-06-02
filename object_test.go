@@ -771,6 +771,32 @@ func TestUnmarshalJSON(t *testing.T) {
 			t.Fatalf("UnmarshalJSON() error = %q, want trailing token context", err)
 		}
 	})
+
+	t.Run("clears entries when trailing content rejects replacement", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name  string
+			input string
+		}{
+			{name: "trailing token", input: `{"new":"value"} true`},
+			{name: "trailing garbage", input: `{"new":"value"} trailing`},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				obj := NewObject[any]().Set("old", "data")
+				if err := obj.UnmarshalJSON([]byte(tt.input)); err == nil {
+					t.Fatal("UnmarshalJSON() error = nil, want non-nil")
+				}
+				if got := obj.Len(); got != 0 {
+					t.Fatalf("Len() after rejected replacement = %d, want 0", got)
+				}
+			})
+		}
+	})
 }
 
 func TestUnmarshalJSONFrom(t *testing.T) {
@@ -841,9 +867,12 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 		t.Parallel()
 
 		dec := jsontext.NewDecoder(strings.NewReader(`{"key":"first","key":"second"}`), jsontext.AllowDuplicateNames(true))
-		var obj Object[any]
+		obj := NewObject[any]().Set("old", "data")
 		if err := obj.UnmarshalJSONFrom(dec); err == nil {
 			t.Fatal("UnmarshalJSONFrom() error = nil, want non-nil")
+		}
+		if got := obj.Len(); got != 0 {
+			t.Fatalf("Len() after duplicate-key replacement = %d, want 0", got)
 		}
 	})
 
