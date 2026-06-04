@@ -19,6 +19,9 @@ var (
 	ErrExpectedObjectStart = errors.New("expected object start")
 	// ErrExpectedStringKey is returned when the next JSON token is not a string key.
 	ErrExpectedStringKey = errors.New("expected string key")
+
+	errNilJSONEncoder = errors.New("nil JSON encoder")
+	errNilJSONDecoder = errors.New("nil JSON decoder")
 )
 
 // OrderedMarshaler marshals a value to JSON while preserving key order.
@@ -168,6 +171,9 @@ func (o *Object[V]) MarshalJSON() ([]byte, error) {
 // MarshalJSONTo writes the JSON encoding of o to enc.
 // Nested map values are encoded with deterministic key order.
 func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if enc == nil {
+		return errNilJSONEncoder
+	}
 	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
 		return err
 	}
@@ -247,6 +253,9 @@ func readObjectKey(dec *jsontext.Decoder) (string, error) {
 func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	clear(o.entries)
 	o.entries = o.entries[:0]
+	if dec == nil {
+		return errNilJSONDecoder
+	}
 	fail := func(err error) error {
 		clear(o.entries)
 		o.entries = o.entries[:0]

@@ -489,6 +489,15 @@ func assertSubstringsInOrder(t *testing.T, s string, substrings []string) {
 func TestMarshalJSONTo(t *testing.T) {
 	t.Parallel()
 
+	t.Run("returns error for nil encoder", func(t *testing.T) {
+		t.Parallel()
+
+		obj := NewObject[int]().Set("a", 1)
+		if err := obj.MarshalJSONTo(nil); err == nil {
+			t.Fatal("MarshalJSONTo(nil) error = nil, want non-nil")
+		}
+	})
+
 	t.Run("writes deterministic map ordering", func(t *testing.T) {
 		t.Parallel()
 
@@ -801,6 +810,18 @@ func TestUnmarshalJSON(t *testing.T) {
 
 func TestUnmarshalJSONFrom(t *testing.T) {
 	t.Parallel()
+
+	t.Run("returns error for nil decoder", func(t *testing.T) {
+		t.Parallel()
+
+		obj := NewObject[any]().Set("old", "data")
+		if err := obj.UnmarshalJSONFrom(nil); err == nil {
+			t.Fatal("UnmarshalJSONFrom(nil) error = nil, want non-nil")
+		}
+		if got := obj.Len(); got != 0 {
+			t.Fatalf("Len() after nil decoder = %d, want 0", got)
+		}
+	})
 
 	t.Run("returns ErrExpectedStringKey for invalid key", func(t *testing.T) {
 		t.Parallel()
