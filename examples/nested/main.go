@@ -11,22 +11,22 @@ import (
 func main() {
 	fmt.Println("=== Nested Structures Example ===")
 
-	config := orderedobject.NewObject[any]().
-		Set("app", orderedobject.NewObject[any]().
+	config := orderedobject.New[any]().
+		Set("app", orderedobject.New[any]().
 			Set("name", "MyApp").
 			Set("version", "1.0.0").
 			Set("debug", true)).
-		Set("server", orderedobject.NewObject[any]().
+		Set("server", orderedobject.New[any]().
 			Set("host", "localhost").
 			Set("port", 8080).
-			Set("ssl", orderedobject.NewObject[any]().
+			Set("ssl", orderedobject.New[any]().
 				Set("enabled", true).
 				Set("cert", "/path/to/cert.pem"))).
-		Set("database", orderedobject.NewObject[any]().
+		Set("database", orderedobject.New[any]().
 			Set("driver", "postgres").
 			Set("host", "db.example.com").
 			Set("port", 5432).
-			Set("credentials", orderedobject.NewObject[any]().
+			Set("credentials", orderedobject.New[any]().
 				Set("username", "admin").
 				Set("password", "secret")))
 

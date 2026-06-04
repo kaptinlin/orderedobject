@@ -21,6 +21,8 @@ This repository favors small, explicit Go code and lightweight tooling. Standard
 - Use focused named subtests when they clarify observable behavior.
 - Prefer direct standard-library checks plus `cmp.Diff` for comparisons.
 - Do not add assertion frameworks.
+- Test user-visible behavior and public contracts, not copies of spec prose.
+- Do not add spec mirror tests when stronger behavior tests already prove the invariant.
 - When benchmarks are added, use `testing.B.Loop()`.
 - The package gate is `task test`, which runs `go test -race ./...`.
 
@@ -30,12 +32,14 @@ This repository favors small, explicit Go code and lightweight tooling. Standard
 - `task lint` includes golangci-lint and a `go mod tidy` diff check.
 - `SPECS/**` is canonical design documentation and must stay markdownlint-clean.
 - `README.md` is usage-oriented, and `CLAUDE.md` is agent-oriented.
+- Do not create policy-only gate scripts whose only job is to restate `SPECS/`, `README.md`, or `CLAUDE.md`.
 
 ## Forbidden
 
 - Do not add testify-style assertion layers or similar test frameworks.
 - Do not exclude `SPECS/**` from markdown linting.
 - Do not place normative design rules only in code comments, `README.md`, or `CLAUDE.md`.
+- Do not enforce documentation policy with custom scripts unless a program consumes the rule as product behavior.
 
 ## Acceptance Criteria
 

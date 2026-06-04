@@ -13,14 +13,14 @@ import (
 func main() {
 	fmt.Println("=== JSON Operations Example ===")
 
-	user := orderedobject.NewObject[any]().
+	user := orderedobject.New[any]().
 		Set("id", 1001).
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
 		Set("active", true)
 
-	fmt.Println("\n1. Using ToJSON:")
-	data1, err := user.ToJSON()
+	fmt.Println("\n1. Using MarshalJSON:")
+	data1, err := user.MarshalJSON()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func main() {
 	fmt.Println(string(data2))
 
 	fmt.Println("\n3. Via map (order not preserved):")
-	data3, err := jsonlib.Marshal(user.ToMap())
+	data3, err := jsonlib.Marshal(user.ToUnorderedMap())
 	if err != nil {
 		log.Fatal(err)
 	}

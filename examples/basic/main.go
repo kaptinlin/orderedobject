@@ -10,7 +10,7 @@ import (
 func main() {
 	fmt.Println("=== Basic Operations Example ===")
 
-	config := orderedobject.NewObject[any]().
+	config := orderedobject.New[any]().
 		Set("app_name", "MyApp").
 		Set("version", "1.0.0").
 		Set("debug", true).

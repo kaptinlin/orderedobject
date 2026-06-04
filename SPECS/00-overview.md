@@ -8,24 +8,28 @@
 
 - The package exposes one ordered container, `Object[V any]`, plus `Entry[V]` and `OrderedMarshaler`.
 - The package is optimized for small-to-medium JSON objects where explicit ordering matters more than constant-time lookup.
+- Map boundaries are explicit: sorted imports invent deterministic lexical order, unordered imports and exports drop ordering semantics.
 - Examples and README content are explanatory only; normative design rules live in `SPECS/`.
 
 > **Why:** Most callers need a small ordered-object type for payload shaping, config-like documents, and stable JSON output. Keeping the scope narrow preserves readability and avoids inventing a second collection framework.
 >
-> **Rejected:** A full JSON AST, package layering for hypothetical future growth, and performance features that only pay off for very large objects.
+> **Rejected:** A full JSON AST, package layering for hypothetical future growth, compatibility aliases, and performance features that only pay off for very large objects.
 
 ## Non-Goals
 
 - Provide map-like constant-time lookups through a shadow index.
 - Preserve order when converting through `map[string]V`.
 - Model every JSON value kind as its own package-level abstraction.
+- Maintain duplicate public paths for the same operation.
 
 ## Forbidden
 
 - Do not add extra indexing layers or configurability to optimize hypothetical large-object workloads.
   Use the existing slice-backed model until profiling shows a real need.
-- Do not treat `FromMap` or `ToMap` as order-preserving APIs.
-  Use `Object` methods or JSON encoding when order matters.
+- Do not treat unordered map conversion as order-preserving.
+  Use `Object` methods, `FromEntries`, `FromSortedMap`, or JSON encoding when order matters.
+- Do not add compatibility aliases for removed public names.
+  Keep one clear public path for each operation.
 - Do not duplicate normative design rules in `README.md` or `CLAUDE.md`.
   Keep `SPECS/` as the single source of truth.
 

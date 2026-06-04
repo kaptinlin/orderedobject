@@ -41,7 +41,7 @@ database:
 func TestPrintAppNameSkipsMissingName(t *testing.T) {
 	// os.Stdout is process-wide.
 	got := testutil.CaptureOutput(t, func() {
-		printAppName(orderedobject.NewObject[any]())
+		printAppName(orderedobject.New[any]())
 	})
 	if got != "" {
 		t.Fatalf("printAppName() output = %q, want empty", got)

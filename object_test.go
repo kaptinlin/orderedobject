@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 
@@ -13,13 +12,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestNewObject(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	t.Run("without capacity", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[int]()
+		obj := New[int]()
 		if got := obj.Len(); got != 0 {
 			t.Fatalf("Len() = %d, want 0", got)
 		}
@@ -33,7 +32,7 @@ func TestNewObject(t *testing.T) {
 	t.Run("with capacity", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[int](3)
+		obj := NewCap[int](3)
 		obj.Set("a", 1).Set("b", 2).Set("c", 3).Set("d", 4)
 		if got := obj.Len(); got != 4 {
 			t.Fatalf("Len() = %d, want 4", got)
@@ -48,7 +47,7 @@ func TestNewObject(t *testing.T) {
 	t.Run("with negative capacity", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[int](-1)
+		obj := NewCap[int](-1)
 		if got := obj.Len(); got != 0 {
 			t.Fatalf("Len() = %d, want 0", got)
 		}
@@ -60,14 +59,14 @@ func TestNewObject(t *testing.T) {
 	})
 }
 
-func TestFromMap(t *testing.T) {
+func TestFromUnorderedMap(t *testing.T) {
 	t.Parallel()
 
 	t.Run("copies all entries", func(t *testing.T) {
 		t.Parallel()
 
 		input := map[string]int{"a": 1, "b": 2, "c": 3}
-		obj := FromMap(input)
+		obj := FromUnorderedMap(input)
 		if got := obj.Len(); got != len(input) {
 			t.Fatalf("Len() = %d, want %d", got, len(input))
 		}
@@ -87,7 +86,7 @@ func TestFromMap(t *testing.T) {
 		t.Parallel()
 
 		input := map[string]int{"count": 1}
-		obj := FromMap(input)
+		obj := FromUnorderedMap(input)
 		input["count"] = 2
 
 		got, found := obj.Get("count")
@@ -100,10 +99,49 @@ func TestFromMap(t *testing.T) {
 	})
 }
 
+func TestFromEntries(t *testing.T) {
+	t.Parallel()
+
+	t.Run("preserves order and copies entries", func(t *testing.T) {
+		t.Parallel()
+
+		input := []Entry[int]{{Key: "b", Value: 2}, {Key: "a", Value: 1}}
+		obj, err := FromEntries(input)
+		if err != nil {
+			t.Fatalf("FromEntries() error = %v", err)
+		}
+
+		input[0] = Entry[int]{Key: "changed", Value: 99}
+		want := []Entry[int]{{Key: "b", Value: 2}, {Key: "a", Value: 1}}
+		if diff := cmp.Diff(want, obj.Entries()); diff != "" {
+			t.Errorf("Entries() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("rejects duplicate keys", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := FromEntries([]Entry[int]{{Key: "a", Value: 1}, {Key: "a", Value: 2}})
+		if !errors.Is(err, ErrDuplicateKey) {
+			t.Fatalf("errors.Is(%v, ErrDuplicateKey) = false", err)
+		}
+	})
+}
+
+func TestFromSortedMap(t *testing.T) {
+	t.Parallel()
+
+	obj := FromSortedMap(map[string]int{"z": 26, "a": 1, "m": 13})
+	want := []Entry[int]{{Key: "a", Value: 1}, {Key: "m", Value: 13}, {Key: "z", Value: 26}}
+	if diff := cmp.Diff(want, obj.Entries()); diff != "" {
+		t.Errorf("Entries() mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestSetGetHasDeleteLen(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any]()
+	obj := New[any]()
 	if got := obj.Len(); got != 0 {
 		t.Fatalf("Len() = %d, want 0", got)
 	}
@@ -160,7 +198,7 @@ func TestSetGetHasDeleteLen(t *testing.T) {
 func TestEmptyStringKey(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[int]().Set("", 1).Set("named", 2)
+	obj := New[int]().Set("", 1).Set("named", 2)
 
 	if got, found := obj.Get(""); !found || got != 1 {
 		t.Fatalf("Get(\"\") = (%v, %v), want (1, true)", got, found)
@@ -192,7 +230,7 @@ func TestKeysValuesEntries(t *testing.T) {
 	t.Run("empty object", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[int]()
+		obj := New[int]()
 		if diff := cmp.Diff([]string{}, obj.Keys()); diff != "" {
 			t.Errorf("Keys() mismatch (-want +got):\n%s", diff)
 		}
@@ -207,7 +245,7 @@ func TestKeysValuesEntries(t *testing.T) {
 	t.Run("preserve insertion order and return copies", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[int]().Set("a", 1).Set("b", 2).Set("c", 3)
+		obj := New[int]().Set("a", 1).Set("b", 2).Set("c", 3)
 		wantKeys := []string{"a", "b", "c"}
 		wantValues := []int{1, 2, 3}
 		wantEntries := []Entry[int]{{Key: "a", Value: 1}, {Key: "b", Value: 2}, {Key: "c", Value: 3}}
@@ -244,7 +282,7 @@ func TestKeysValuesEntries(t *testing.T) {
 func TestForEach(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[int]().Set("a", 1).Set("b", 2).Set("c", 3)
+	obj := New[int]().Set("a", 1).Set("b", 2).Set("c", 3)
 	var gotKeys []string
 	var sum int
 
@@ -265,7 +303,7 @@ func TestForEach(t *testing.T) {
 func TestForEachToleratesMutation(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[int]().Set("a", 1).Set("b", 2).Set("c", 3)
+	obj := New[int]().Set("a", 1).Set("b", 2).Set("c", 3)
 	var gotKeys []string
 
 	obj.ForEach(func(key string, value int) {
@@ -299,7 +337,7 @@ func TestLargeValueOperations(t *testing.T) {
 
 	want := newLargeValue("alpha", 1)
 	second := newLargeValue("beta", 100)
-	obj := NewObject[largeValue]().Set("first", want).Set("second", second)
+	obj := New[largeValue]().Set("first", want).Set("second", second)
 
 	got, found := obj.Get("first")
 	if !found {
@@ -349,15 +387,15 @@ func TestLargeValueOperations(t *testing.T) {
 		t.Errorf("ForEach() mismatch (-want +got):\n%s", diff)
 	}
 
-	if diff := cmp.Diff(map[string]largeValue{"second": second}, obj.ToMap()); diff != "" {
-		t.Errorf("ToMap() mismatch (-want +got):\n%s", diff)
+	if diff := cmp.Diff(map[string]largeValue{"second": second}, obj.ToUnorderedMap()); diff != "" {
+		t.Errorf("ToUnorderedMap() mismatch (-want +got):\n%s", diff)
 	}
 }
 
 func TestClone(t *testing.T) {
 	t.Parallel()
 
-	original := NewObject[any]().
+	original := New[any]().
 		Set("a", 1).
 		Set("nested", []int{1, 2}).
 		Set("c", 3)
@@ -392,27 +430,54 @@ func TestClone(t *testing.T) {
 	}
 }
 
-func TestToMap(t *testing.T) {
+func TestToUnorderedMap(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[int]().Set("a", 1).Set("b", 2)
-	got := obj.ToMap()
+	obj := New[int]().Set("a", 1).Set("b", 2)
+	got := obj.ToUnorderedMap()
 	want := map[string]int{"a": 1, "b": 2}
 	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("ToMap() mismatch (-want +got):\n%s", diff)
+		t.Errorf("ToUnorderedMap() mismatch (-want +got):\n%s", diff)
 	}
 
 	got["a"] = 99
 	value, found := obj.Get("a")
 	if !found {
-		t.Fatal("Get(\"a\") not found after ToMap mutation")
+		t.Fatal("Get(\"a\") not found after ToUnorderedMap mutation")
 	}
 	if value != 1 {
 		t.Fatalf("Get(\"a\") = %d, want 1", value)
 	}
 }
 
-func TestMarshalJSONAndToJSON(t *testing.T) {
+func TestNilObjectReadMethods(t *testing.T) {
+	t.Parallel()
+
+	var obj *Object[int]
+	if got := obj.Len(); got != 0 {
+		t.Fatalf("Len() = %d, want 0", got)
+	}
+	if obj.Has("missing") {
+		t.Fatal("Has(\"missing\") = true, want false")
+	}
+	if got, found := obj.Get("missing"); found || got != 0 {
+		t.Fatalf("Get(\"missing\") = (%v, %v), want (0, false)", got, found)
+	}
+	if diff := cmp.Diff([]string{}, obj.Keys()); diff != "" {
+		t.Errorf("Keys() mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]int{}, obj.Values()); diff != "" {
+		t.Errorf("Values() mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]Entry[int]{}, obj.Entries()); diff != "" {
+		t.Errorf("Entries() mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(map[string]int{}, obj.ToUnorderedMap()); diff != "" {
+		t.Errorf("ToUnorderedMap() mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestMarshalJSON(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -422,31 +487,31 @@ func TestMarshalJSONAndToJSON(t *testing.T) {
 	}{
 		{
 			name: "empty object",
-			obj:  NewObject[any](),
-			want: `{}` + "\n",
+			obj:  New[any](),
+			want: `{}`,
 		},
 		{
 			name: "ordered values",
-			obj: NewObject[any]().
+			obj: New[any]().
 				Set("name", "John").
 				Set("age", 30).
 				Set("city", "New York"),
-			want: `{"name":"John","age":30,"city":"New York"}` + "\n",
+			want: `{"name":"John","age":30,"city":"New York"}`,
 		},
 		{
 			name: "nested ordered object",
-			obj: NewObject[any]().
+			obj: New[any]().
 				Set("name", "Alice").
-				Set("address", NewObject[any]().Set("street", "123 Main St").Set("zip", "10001")),
-			want: `{"name":"Alice","address":{"street":"123 Main St","zip":"10001"}}` + "\n",
+				Set("address", New[any]().Set("street", "123 Main St").Set("zip", "10001")),
+			want: `{"name":"Alice","address":{"street":"123 Main St","zip":"10001"}}`,
 		},
 		{
 			name: "array of ordered objects",
-			obj: NewObject[any]().Set("people", []any{
-				NewObject[any]().Set("name", "Bob").Set("age", 35),
-				NewObject[any]().Set("name", "Charlie").Set("age", 40),
+			obj: New[any]().Set("people", []any{
+				New[any]().Set("name", "Bob").Set("age", 35),
+				New[any]().Set("name", "Charlie").Set("age", 40),
 			}),
-			want: `{"people":[{"name":"Bob","age":35},{"name":"Charlie","age":40}]}` + "\n",
+			want: `{"people":[{"name":"Bob","age":35},{"name":"Charlie","age":40}]}`,
 		},
 	}
 
@@ -462,12 +527,12 @@ func TestMarshalJSONAndToJSON(t *testing.T) {
 				t.Fatalf("MarshalJSON() = %q, want %q", string(got), tt.want)
 			}
 
-			toJSON, err := tt.obj.ToJSON()
+			packageJSON, err := json.Marshal(tt.obj)
 			if err != nil {
-				t.Fatalf("ToJSON() error = %v", err)
+				t.Fatalf("json.Marshal() error = %v", err)
 			}
-			if string(toJSON)+"\n" != tt.want {
-				t.Fatalf("ToJSON() = %q, want %q", string(toJSON), strings.TrimSuffix(tt.want, "\n"))
+			if string(packageJSON) != tt.want {
+				t.Fatalf("json.Marshal() = %q, want %q", string(packageJSON), tt.want)
 			}
 		})
 	}
@@ -492,16 +557,16 @@ func TestMarshalJSONTo(t *testing.T) {
 	t.Run("returns error for nil encoder", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[int]().Set("a", 1)
-		if err := obj.MarshalJSONTo(nil); err == nil {
-			t.Fatal("MarshalJSONTo(nil) error = nil, want non-nil")
+		obj := New[int]().Set("a", 1)
+		if err := obj.MarshalJSONTo(nil); !errors.Is(err, ErrNilJSONEncoder) {
+			t.Fatalf("errors.Is(%v, ErrNilJSONEncoder) = false", err)
 		}
 	})
 
 	t.Run("writes deterministic map ordering", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[any]().Set("fruits", map[string]any{
+		obj := New[any]().Set("fruits", map[string]any{
 			"zebra":  1,
 			"apple":  2,
 			"mango":  3,
@@ -531,7 +596,7 @@ func TestMarshalJSONTo(t *testing.T) {
 	t.Run("returns error for unmarshalable value", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[any]().Set("fn", func() {})
+		obj := New[any]().Set("fn", func() {})
 		var buf bytes.Buffer
 		enc := jsontext.NewEncoder(&buf)
 		if err := obj.MarshalJSONTo(enc); err == nil {
@@ -542,7 +607,7 @@ func TestMarshalJSONTo(t *testing.T) {
 	t.Run("returns ordered marshaler error", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[any]().Set("broken", failingMarshaler{})
+		obj := New[any]().Set("broken", failingMarshaler{})
 		var buf bytes.Buffer
 		enc := jsontext.NewEncoder(&buf)
 		if err := obj.MarshalJSONTo(enc); !errors.Is(err, errFailingMarshaler) {
@@ -562,7 +627,7 @@ func (failingMarshaler) MarshalJSONTo(*jsontext.Encoder) error {
 func TestOrderedMarshalerInterface(t *testing.T) {
 	t.Parallel()
 
-	inner := NewObject[any]().Set("z", 3).Set("w", 4)
+	inner := New[any]().Set("z", 3).Set("w", 4)
 	var marshaler OrderedMarshaler = inner
 
 	var buf bytes.Buffer
@@ -578,7 +643,7 @@ func TestOrderedMarshalerInterface(t *testing.T) {
 func TestMarshalJSONReturnsOrderedMarshalerError(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any]().Set("broken", failingMarshaler{})
+	obj := New[any]().Set("broken", failingMarshaler{})
 	_, err := obj.MarshalJSON()
 	if !errors.Is(err, errFailingMarshaler) {
 		t.Fatalf("errors.Is(%v, errFailingMarshaler) = false", err)
@@ -589,29 +654,34 @@ func TestMarshalJSONEncodesNilOrderedMarshalerAsNull(t *testing.T) {
 	t.Parallel()
 
 	var child *Object[any]
-	obj := NewObject[any]().Set("child", child)
+	obj := New[any]().Set("child", child)
 
 	got, err := obj.MarshalJSON()
 	if err != nil {
 		t.Fatalf("MarshalJSON() error = %v", err)
 	}
-	if string(got) != `{"child":null}`+"\n" {
-		t.Fatalf("MarshalJSON() = %q, want %q", got, `{"child":null}`+"\n")
+	if string(got) != `{"child":null}` {
+		t.Fatalf("MarshalJSON() = %q, want %q", got, `{"child":null}`)
 	}
+}
 
-	toJSON, err := obj.ToJSON()
+func TestMarshalJSONEncodesNilObjectAsNull(t *testing.T) {
+	t.Parallel()
+
+	var obj *Object[any]
+	got, err := obj.MarshalJSON()
 	if err != nil {
-		t.Fatalf("ToJSON() error = %v", err)
+		t.Fatalf("MarshalJSON() error = %v", err)
 	}
-	if string(toJSON) != `{"child":null}` {
-		t.Fatalf("ToJSON() = %q, want %q", toJSON, `{"child":null}`)
+	if string(got) != `null` {
+		t.Fatalf("MarshalJSON() = %q, want null", got)
 	}
 }
 
 func TestMarshalJSONPreservesDeterministicNestedMapOrdering(t *testing.T) {
 	t.Parallel()
 
-	obj := NewObject[any]().Set("fruits", map[string]any{
+	obj := New[any]().Set("fruits", map[string]any{
 		"zebra":  1,
 		"apple":  2,
 		"mango":  3,
@@ -627,32 +697,14 @@ func TestMarshalJSONPreservesDeterministicNestedMapOrdering(t *testing.T) {
 		}
 		return string(data)
 	}
-	toJSON := func(t *testing.T) string {
-		t.Helper()
-
-		data, err := obj.ToJSON()
-		if err != nil {
-			t.Fatalf("ToJSON() error = %v", err)
-		}
-		return string(data)
-	}
-
 	firstMarshalJSON := marshalJSON(t)
-	firstToJSON := toJSON(t)
-	if firstMarshalJSON != firstToJSON+"\n" {
-		t.Fatalf("MarshalJSON() = %q, want %q", firstMarshalJSON, firstToJSON+"\n")
-	}
-
 	for range 5 {
 		if got := marshalJSON(t); got != firstMarshalJSON {
 			t.Fatalf("MarshalJSON() changed nested map order: got %q, want %q", got, firstMarshalJSON)
 		}
-		if got := toJSON(t); got != firstToJSON {
-			t.Fatalf("ToJSON() changed nested map order: got %q, want %q", got, firstToJSON)
-		}
 	}
 
-	assertSubstringsInOrder(t, firstToJSON, []string{`"apple"`, `"banana"`, `"mango"`, `"zebra"`})
+	assertSubstringsInOrder(t, firstMarshalJSON, []string{`"apple"`, `"banana"`, `"mango"`, `"zebra"`})
 }
 
 func TestFromJSON(t *testing.T) {
@@ -716,8 +768,8 @@ func TestFromJSONErrors(t *testing.T) {
 		{name: "non-string key", input: `{1:"value"}`, wantError: ErrExpectedStringKey},
 		{name: "primitive instead of object", input: `"hello"`, wantError: ErrExpectedObjectStart},
 		{name: "empty input", input: ``, wantError: nil},
-		{name: "duplicate keys", input: `{"key":"value1","key":"value2"}`, wantError: nil},
-		{name: "trailing garbage", input: `{"ok":1} trailing`, wantError: nil},
+		{name: "duplicate keys", input: `{"key":"value1","key":"value2"}`, wantError: ErrDuplicateKey},
+		{name: "trailing garbage", input: `{"ok":1} trailing`, wantError: ErrTrailingToken},
 	}
 
 	for _, tt := range tests {
@@ -741,7 +793,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	t.Run("clears existing entries", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[any]().Set("old", "data")
+		obj := New[any]().Set("old", "data")
 		if err := obj.UnmarshalJSON([]byte(`{"new":"value"}`)); err != nil {
 			t.Fatalf("UnmarshalJSON() error = %v", err)
 		}
@@ -768,20 +820,20 @@ func TestUnmarshalJSON(t *testing.T) {
 		}
 	})
 
-	t.Run("returns unexpected eof for trailing tokens", func(t *testing.T) {
+	t.Run("returns ErrTrailingToken for trailing tokens", func(t *testing.T) {
 		t.Parallel()
 
 		var obj Object[any]
 		err := obj.UnmarshalJSON([]byte(`{"ok":1} true`))
-		if !errors.Is(err, io.ErrUnexpectedEOF) {
-			t.Fatalf("errors.Is(%v, io.ErrUnexpectedEOF) = false", err)
+		if !errors.Is(err, ErrTrailingToken) {
+			t.Fatalf("errors.Is(%v, ErrTrailingToken) = false", err)
 		}
 		if !strings.Contains(err.Error(), "unexpected trailing token true") {
 			t.Fatalf("UnmarshalJSON() error = %q, want trailing token context", err)
 		}
 	})
 
-	t.Run("clears entries when trailing content rejects replacement", func(t *testing.T) {
+	t.Run("keeps entries when trailing content rejects replacement", func(t *testing.T) {
 		t.Parallel()
 
 		tests := []struct {
@@ -796,12 +848,12 @@ func TestUnmarshalJSON(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				obj := NewObject[any]().Set("old", "data")
+				obj := New[any]().Set("old", "data")
 				if err := obj.UnmarshalJSON([]byte(tt.input)); err == nil {
 					t.Fatal("UnmarshalJSON() error = nil, want non-nil")
 				}
-				if got := obj.Len(); got != 0 {
-					t.Fatalf("Len() after rejected replacement = %d, want 0", got)
+				if got, found := obj.Get("old"); !found || got != "data" {
+					t.Fatalf("Get(\"old\") after rejected replacement = (%v, %v), want (data, true)", got, found)
 				}
 			})
 		}
@@ -814,12 +866,12 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 	t.Run("returns error for nil decoder", func(t *testing.T) {
 		t.Parallel()
 
-		obj := NewObject[any]().Set("old", "data")
-		if err := obj.UnmarshalJSONFrom(nil); err == nil {
-			t.Fatal("UnmarshalJSONFrom(nil) error = nil, want non-nil")
+		obj := New[any]().Set("old", "data")
+		if err := obj.UnmarshalJSONFrom(nil); !errors.Is(err, ErrNilJSONDecoder) {
+			t.Fatalf("errors.Is(%v, ErrNilJSONDecoder) = false", err)
 		}
-		if got := obj.Len(); got != 0 {
-			t.Fatalf("Len() after nil decoder = %d, want 0", got)
+		if got, found := obj.Get("old"); !found || got != "data" {
+			t.Fatalf("Get(\"old\") after nil decoder = (%v, %v), want (data, true)", got, found)
 		}
 	})
 
@@ -847,17 +899,17 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 		}
 	})
 
-	t.Run("clears entries before malformed replacement", func(t *testing.T) {
+	t.Run("keeps entries before malformed replacement", func(t *testing.T) {
 		t.Parallel()
 
 		dec := jsontext.NewDecoder(strings.NewReader(`{"new":1,`))
-		obj := NewObject[any]().Set("old", "data")
+		obj := New[any]().Set("old", "data")
 
 		if err := obj.UnmarshalJSONFrom(dec); err == nil {
 			t.Fatal("UnmarshalJSONFrom() error = nil, want non-nil")
 		}
-		if got := obj.Len(); got != 0 {
-			t.Fatalf("Len() after malformed replacement = %d, want 0", got)
+		if got, found := obj.Get("old"); !found || got != "data" {
+			t.Fatalf("Get(\"old\") after malformed replacement = (%v, %v), want (data, true)", got, found)
 		}
 	})
 
@@ -888,12 +940,12 @@ func TestUnmarshalJSONFrom(t *testing.T) {
 		t.Parallel()
 
 		dec := jsontext.NewDecoder(strings.NewReader(`{"key":"first","key":"second"}`), jsontext.AllowDuplicateNames(true))
-		obj := NewObject[any]().Set("old", "data")
-		if err := obj.UnmarshalJSONFrom(dec); err == nil {
-			t.Fatal("UnmarshalJSONFrom() error = nil, want non-nil")
+		obj := New[any]().Set("old", "data")
+		if err := obj.UnmarshalJSONFrom(dec); !errors.Is(err, ErrDuplicateKey) {
+			t.Fatalf("errors.Is(%v, ErrDuplicateKey) = false", err)
 		}
-		if got := obj.Len(); got != 0 {
-			t.Fatalf("Len() after duplicate-key replacement = %d, want 0", got)
+		if got, found := obj.Get("old"); !found || got != "data" {
+			t.Fatalf("Get(\"old\") after duplicate-key replacement = (%v, %v), want (data, true)", got, found)
 		}
 	})
 
@@ -937,12 +989,12 @@ func TestJSONRoundTrip(t *testing.T) {
 				t.Fatalf("FromJSON() error = %v", err)
 			}
 
-			got, err := obj.ToJSON()
+			got, err := obj.MarshalJSON()
 			if err != nil {
-				t.Fatalf("ToJSON() error = %v", err)
+				t.Fatalf("MarshalJSON() error = %v", err)
 			}
 			if string(got) != tt.input {
-				t.Fatalf("ToJSON() = %q, want %q", string(got), tt.input)
+				t.Fatalf("MarshalJSON() = %q, want %q", string(got), tt.input)
 			}
 		})
 	}
@@ -990,13 +1042,13 @@ func TestJSONTags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			obj := NewObject[user]().Set("user", tt.input)
-			got, err := obj.ToJSON()
+			obj := New[user]().Set("user", tt.input)
+			got, err := obj.MarshalJSON()
 			if err != nil {
-				t.Fatalf("ToJSON() error = %v", err)
+				t.Fatalf("MarshalJSON() error = %v", err)
 			}
 			if string(got) != tt.want {
-				t.Fatalf("ToJSON() = %q, want %q", string(got), tt.want)
+				t.Fatalf("MarshalJSON() = %q, want %q", string(got), tt.want)
 			}
 
 			var decoded Object[user]
@@ -1017,14 +1069,14 @@ func TestJSONTags(t *testing.T) {
 }
 
 func BenchmarkObjectSet(b *testing.B) {
-	obj := NewObject[any](100)
+	obj := NewCap[any](100)
 	for b.Loop() {
 		obj.Set("key", 42)
 	}
 }
 
 func BenchmarkObjectGet(b *testing.B) {
-	obj := NewObject[any](100)
+	obj := NewCap[any](100)
 	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
@@ -1034,7 +1086,7 @@ func BenchmarkObjectGet(b *testing.B) {
 }
 
 func BenchmarkObjectHas(b *testing.B) {
-	obj := NewObject[any](100)
+	obj := NewCap[any](100)
 	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
@@ -1044,7 +1096,7 @@ func BenchmarkObjectHas(b *testing.B) {
 }
 
 func BenchmarkObjectDelete(b *testing.B) {
-	obj := NewObject[any](100)
+	obj := NewCap[any](100)
 	for i := range 100 {
 		obj.Set(fmt.Sprintf("key%d", i), i)
 	}
@@ -1055,7 +1107,7 @@ func BenchmarkObjectDelete(b *testing.B) {
 }
 
 func BenchmarkObjectMarshalJSON(b *testing.B) {
-	obj := NewObject[any](10)
+	obj := NewCap[any](10)
 	obj.Set("name", "John").
 		Set("age", 30).
 		Set("city", "New York").

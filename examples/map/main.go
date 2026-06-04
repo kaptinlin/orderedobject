@@ -17,14 +17,14 @@ func main() {
 		"language":      "en",
 	}
 
-	obj := orderedobject.FromMap(settings)
+	obj := orderedobject.FromUnorderedMap(settings)
 	fmt.Println("\nFrom map (order follows Go map iteration):")
 	obj.ForEach(func(key string, value any) {
 		fmt.Printf("  %s: %v\n", key, value)
 	})
 
 	fmt.Println("\nBack to map (order not preserved):")
-	for k, v := range obj.ToMap() {
+	for k, v := range obj.ToUnorderedMap() {
 		fmt.Printf("  %s: %v\n", k, v)
 	}
 }

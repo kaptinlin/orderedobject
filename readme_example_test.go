@@ -6,13 +6,13 @@ import (
 	"github.com/kaptinlin/orderedobject"
 )
 
-func ExampleObject_ToJSON() {
-	person := orderedobject.NewObject[any]().
+func ExampleObject_MarshalJSON() {
+	person := orderedobject.New[any]().
 		Set("name", "Alice").
 		Set("age", 30).
 		Set("city", "New York")
 
-	data, err := person.ToJSON()
+	data, err := person.MarshalJSON()
 	if err != nil {
 		fmt.Println(err)
 		return

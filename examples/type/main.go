@@ -21,11 +21,11 @@ func main() {
 		Active bool
 	}
 
-	users := orderedobject.NewObject[User]().
+	users := orderedobject.New[User]().
 		Set("user1", User{Name: "Alice", Age: 30, Email: "alice@example.com"}).
 		Set("user2", User{Name: "Bob", Age: 25, Email: "bob@example.com"})
 
-	settings := orderedobject.NewObject[Settings]().
+	settings := orderedobject.New[Settings]().
 		Set("default", Settings{Theme: "light", Active: true}).
 		Set("custom", Settings{Theme: "dark", Active: false})
 

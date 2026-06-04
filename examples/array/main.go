@@ -10,14 +10,14 @@ import (
 func main() {
 	fmt.Println("=== Array Operations Example ===")
 
-	config := orderedobject.NewObject[any]().
+	config := orderedobject.New[any]().
 		Set("tags", []string{"go", "json", "ordered"}).
 		Set("numbers", []int{1, 2, 3, 4, 5}).
 		Set("settings", []any{
-			orderedobject.NewObject[any]().
+			orderedobject.New[any]().
 				Set("name", "setting1").
 				Set("value", 100),
-			orderedobject.NewObject[any]().
+			orderedobject.New[any]().
 				Set("name", "setting2").
 				Set("value", 200),
 		})

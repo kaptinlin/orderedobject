@@ -14,8 +14,8 @@ func main() {
 	printPort(config)
 	printLookup(config, "nonexistent")
 
-	nestedConfig := orderedobject.NewObject[any]().
-		Set("server", orderedobject.NewObject[any]().
+	nestedConfig := orderedobject.New[any]().
+		Set("server", orderedobject.New[any]().
 			Set("port", 8080))
 	printServerPort(nestedConfig)
 }
@@ -24,7 +24,7 @@ func printConfig(data string) *orderedobject.Object[any] {
 	config, err := orderedobject.FromJSON[any]([]byte(data))
 	if err != nil {
 		fmt.Printf("\nParse error: %v\n", err)
-		return orderedobject.NewObject[any]()
+		return orderedobject.New[any]()
 	}
 	fmt.Println("\nSuccessfully parsed JSON")
 	return config

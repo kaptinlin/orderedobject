@@ -13,7 +13,7 @@ func TestMainOutput(t *testing.T) {
 	required := []string{
 		`=== JSON Operations Example ===
 
-1. Using ToJSON:
+1. Using MarshalJSON:
 {"id":1001,"name":"John Doe","email":"john@example.com","active":true}
 
 2. Using json.Marshal:

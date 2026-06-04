@@ -12,19 +12,23 @@
 
 > **Why:** The package solves one narrow problem. Keeping the implementation local and visible makes the behavior easy to audit and reduces maintenance overhead.
 >
-> **Rejected:** Multi-package decomposition, generated wrappers, and indirection whose main benefit would be architectural symmetry instead of clarity.
+> **Rejected:** Multi-package decomposition, generated wrappers, compatibility shim packages, and indirection whose main benefit would be architectural symmetry instead of clarity.
 
 ## Storage Model
 
 - `Object[V]` stores data as `[]Entry[V]`.
 - Key lookup uses a linear scan over that slice.
 - Mutating operations update the slice directly.
-- Decode paths clear old entries before re-slicing so replaced values can be released for garbage collection.
+- Ordered imports copy into a fresh entries slice.
+- Decode paths build local entries first and replace the receiver only after the full replacement content is accepted.
+- Successful replacement clears old entries before assigning the new sequence so replaced values can be released for garbage collection.
 
 ## JSON Pipeline
 
-- Marshal paths write JSON through `jsontext.Encoder`.
+- Ordered marshal paths write JSON through `jsontext.Encoder`.
 - The encoder writes object delimiters and string keys as tokens, then delegates value encoding.
+- `MarshalJSON` uses the token-stream path and returns compact bytes without the encoder's top-level stream newline.
+- `MarshalJSONTo` writes directly to the provided encoder and keeps that encoder's formatting and stream behavior.
 - Nested `OrderedMarshaler` values bypass the generic value encoder so they can preserve their own order.
 - Non-ordered map values are encoded with `json.Deterministic(true)` to stabilize nested map output.
 - Unmarshal paths read from `jsontext.Decoder` and decode each member value directly into `V`.
@@ -39,6 +43,7 @@
 - Do not add a shadow `map[string]int` or similar index alongside the entries slice without measured need.
 - Do not route ordered JSON operations through unordered maps.
 - Do not split the ordered-object core across multiple packages unless a new domain boundary appears.
+- Do not add reader, writer, or append JSON APIs without a concrete caller that needs that exact boundary.
 
 ## Acceptance Criteria
 

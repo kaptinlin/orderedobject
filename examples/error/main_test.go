@@ -40,7 +40,7 @@ func TestPrintConfigReportsParseError(t *testing.T) {
 
 func TestPrintPortReportsNumber(t *testing.T) {
 	// os.Stdout is process-wide.
-	config := orderedobject.NewObject[any]().Set("port", float64(8080))
+	config := orderedobject.New[any]().Set("port", float64(8080))
 	got := testutil.CaptureOutput(t, func() {
 		printPort(config)
 	})
@@ -53,7 +53,7 @@ func TestPrintPortReportsNumber(t *testing.T) {
 func TestPrintPortSkipsMissingPort(t *testing.T) {
 	// os.Stdout is process-wide.
 	got := testutil.CaptureOutput(t, func() {
-		printPort(orderedobject.NewObject[any]())
+		printPort(orderedobject.New[any]())
 	})
 	if got != "" {
 		t.Fatalf("printPort() output = %q, want empty", got)
@@ -62,7 +62,7 @@ func TestPrintPortSkipsMissingPort(t *testing.T) {
 
 func TestPrintLookupReportsFoundValue(t *testing.T) {
 	// os.Stdout is process-wide.
-	config := orderedobject.NewObject[any]().Set("answer", 42)
+	config := orderedobject.New[any]().Set("answer", 42)
 	got := testutil.CaptureOutput(t, func() {
 		printLookup(config, "answer")
 	})
@@ -75,7 +75,7 @@ func TestPrintLookupReportsFoundValue(t *testing.T) {
 func TestPrintServerPortReportsMissingServer(t *testing.T) {
 	// os.Stdout is process-wide.
 	got := testutil.CaptureOutput(t, func() {
-		printServerPort(orderedobject.NewObject[any]())
+		printServerPort(orderedobject.New[any]())
 	})
 	want := "server configuration not found\n"
 	if got != want {
@@ -85,7 +85,7 @@ func TestPrintServerPortReportsMissingServer(t *testing.T) {
 
 func TestPrintServerPortReportsWrongType(t *testing.T) {
 	// os.Stdout is process-wide.
-	config := orderedobject.NewObject[any]().Set("server", "localhost")
+	config := orderedobject.New[any]().Set("server", "localhost")
 	got := testutil.CaptureOutput(t, func() {
 		printServerPort(config)
 	})
@@ -97,7 +97,7 @@ func TestPrintServerPortReportsWrongType(t *testing.T) {
 
 func TestPrintServerPortSkipsMissingPort(t *testing.T) {
 	// os.Stdout is process-wide.
-	config := orderedobject.NewObject[any]().Set("server", orderedobject.NewObject[any]())
+	config := orderedobject.New[any]().Set("server", orderedobject.New[any]())
 	got := testutil.CaptureOutput(t, func() {
 		printServerPort(config)
 	})

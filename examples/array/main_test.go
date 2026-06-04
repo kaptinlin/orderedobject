@@ -30,7 +30,7 @@ All values:
 
 func TestPrintArrayConfigFallsBackWhenSettingsIsMissing(t *testing.T) {
 	// os.Stdout is process-wide.
-	config := orderedobject.NewObject[any]().
+	config := orderedobject.New[any]().
 		Set("tags", []string{"go"}).
 		Set("numbers", []int{1, 2})
 
@@ -51,12 +51,12 @@ All values:
 
 func TestPrintArrayConfigSkipsInvalidSettings(t *testing.T) {
 	// os.Stdout is process-wide.
-	config := orderedobject.NewObject[any]().
+	config := orderedobject.New[any]().
 		Set("settings", []any{
 			"not an object",
-			orderedobject.NewObject[any]().Set("value", 100),
-			orderedobject.NewObject[any]().Set("name", "missing value"),
-			orderedobject.NewObject[any]().Set("name", "valid").Set("value", 200),
+			orderedobject.New[any]().Set("value", 100),
+			orderedobject.New[any]().Set("name", "missing value"),
+			orderedobject.New[any]().Set("name", "valid").Set("value", 200),
 		})
 
 	got := testutil.CaptureOutput(t, func() {
