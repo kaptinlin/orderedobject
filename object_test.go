@@ -820,6 +820,19 @@ func TestUnmarshalJSON(t *testing.T) {
 		}
 	})
 
+	t.Run("returns ErrDuplicateKey for duplicate keys", func(t *testing.T) {
+		t.Parallel()
+
+		obj := New[any]().Set("old", "data")
+		err := obj.UnmarshalJSON([]byte(`{"key":"first","key":"second"}`))
+		if !errors.Is(err, ErrDuplicateKey) {
+			t.Fatalf("errors.Is(%v, ErrDuplicateKey) = false", err)
+		}
+		if got, found := obj.Get("old"); !found || got != "data" {
+			t.Fatalf("Get(\"old\") after duplicate-key replacement = (%v, %v), want (data, true)", got, found)
+		}
+	})
+
 	t.Run("returns ErrTrailingToken for trailing tokens", func(t *testing.T) {
 		t.Parallel()
 

@@ -68,8 +68,8 @@ func NewCap[V any](n int) *Object[V] {
 func FromEntries[V any](entries []Entry[V]) (*Object[V], error) {
 	obj := NewCap[V](len(entries))
 	for _, entry := range entries {
-		if obj.findKeyIndex(entry.Key) >= 0 {
-			return nil, fmt.Errorf("duplicate key %q: %w", entry.Key, ErrDuplicateKey)
+		if findEntryIndex(obj.entries, entry.Key) >= 0 {
+			return nil, duplicateKeyError(entry.Key)
 		}
 		obj.entries = append(obj.entries, entry)
 	}
@@ -108,12 +108,7 @@ func (o *Object[V]) findKeyIndex(key string) int {
 	if o == nil {
 		return -1
 	}
-	for i := range o.entries {
-		if o.entries[i].Key == key {
-			return i
-		}
-	}
-	return -1
+	return findEntryIndex(o.entries, key)
 }
 
 // Set stores value under key and returns o.
@@ -316,6 +311,10 @@ func findEntryIndex[V any](entries []Entry[V], key string) int {
 	return -1
 }
 
+func duplicateKeyError(key string) error {
+	return fmt.Errorf("duplicate key %q: %w", key, ErrDuplicateKey)
+}
+
 func decodeEntries[V any](dec *jsontext.Decoder) ([]Entry[V], error) {
 	if dec == nil {
 		return nil, ErrNilJSONDecoder
@@ -337,7 +336,7 @@ func decodeEntries[V any](dec *jsontext.Decoder) ([]Entry[V], error) {
 		}
 
 		if findEntryIndex(entries, key) >= 0 {
-			return nil, fmt.Errorf("duplicate key %q: %w", key, ErrDuplicateKey)
+			return nil, duplicateKeyError(key)
 		}
 
 		var value V
