@@ -246,12 +246,12 @@ func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
 				continue
 			}
 			if err := marshaler.MarshalJSONTo(enc); err != nil {
-				return err
+				return fmt.Errorf("marshal ordered value for key %q: %w", entry.Key, err)
 			}
 			continue
 		}
 		if err := json.MarshalEncode(enc, entry.Value, json.Deterministic(true)); err != nil {
-			return err
+			return fmt.Errorf("marshal value for key %q: %w", entry.Key, err)
 		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
@@ -341,7 +341,7 @@ func decodeEntries[V any](dec *jsontext.Decoder) ([]Entry[V], error) {
 
 		var value V
 		if err := json.UnmarshalDecode(dec, &value); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decode value for key %q: %w", key, err)
 		}
 
 		entries = append(entries, Entry[V]{Key: key, Value: value})

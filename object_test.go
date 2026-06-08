@@ -599,8 +599,12 @@ func TestMarshalJSONTo(t *testing.T) {
 		obj := New[any]().Set("fn", func() {})
 		var buf bytes.Buffer
 		enc := jsontext.NewEncoder(&buf)
-		if err := obj.MarshalJSONTo(enc); err == nil {
+		err := obj.MarshalJSONTo(enc)
+		if err == nil {
 			t.Fatal("MarshalJSONTo() error = nil, want non-nil")
+		}
+		if !strings.Contains(err.Error(), `marshal value for key "fn"`) {
+			t.Fatalf("MarshalJSONTo() error = %q, want key context", err)
 		}
 	})
 
@@ -610,8 +614,12 @@ func TestMarshalJSONTo(t *testing.T) {
 		obj := New[any]().Set("broken", failingMarshaler{})
 		var buf bytes.Buffer
 		enc := jsontext.NewEncoder(&buf)
-		if err := obj.MarshalJSONTo(enc); !errors.Is(err, errFailingMarshaler) {
+		err := obj.MarshalJSONTo(enc)
+		if !errors.Is(err, errFailingMarshaler) {
 			t.Fatalf("errors.Is(%v, errFailingMarshaler) = false", err)
+		}
+		if !strings.Contains(err.Error(), `marshal ordered value for key "broken"`) {
+			t.Fatalf("MarshalJSONTo() error = %q, want key context", err)
 		}
 	})
 }
@@ -753,6 +761,18 @@ func TestFromJSON(t *testing.T) {
 			t.Fatalf("settings[\"notifications\"] = %v, want true", settings["notifications"])
 		}
 	})
+}
+
+func TestFromJSONReportsValueKey(t *testing.T) {
+	t.Parallel()
+
+	_, err := FromJSON[int]([]byte(`{"count":"many"}`))
+	if err == nil {
+		t.Fatal("FromJSON() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), `decode value for key "count"`) {
+		t.Fatalf("FromJSON() error = %q, want key context", err)
+	}
 }
 
 func TestFromJSONErrors(t *testing.T) {
