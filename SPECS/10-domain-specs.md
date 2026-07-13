@@ -8,9 +8,9 @@ The ordered-object domain is defined by stable insertion order, explicit mutatio
 
 - `Object[V any]` stores entries in insertion order.
 - `Entry[V]` represents one key-value pair.
-- `OrderedMarshaler` allows a value to control its own ordered JSON encoding when nested inside an `Object`.
+- Nested values use `encoding/json` method dispatch.
 
-> **Why:** The package needs only one collection type and one extension point. That keeps the public model small while still allowing nested ordered encoders.
+> **Why:** The package needs only one collection type. Standard JSON method dispatch already preserves nested ordered objects without a package-specific extension point.
 >
 > **Rejected:** Separate mutable and immutable object types, hidden iterator objects, multiple nested-order extension mechanisms, and compatibility aliases for duplicate API paths.
 
@@ -22,7 +22,6 @@ The ordered-object domain is defined by stable insertion order, explicit mutatio
 - `FromEntries` copies entries in caller-provided order.
 - `FromEntries` rejects duplicate keys with an error that wraps `ErrDuplicateKey`.
 - `FromSortedMap` copies all map entries in lexical key order.
-- `FromUnorderedMap` copies all map entries using Go map iteration order and does not promise stable order.
 - `FromJSON` decodes a JSON object while preserving member order from the input.
 
 ## Ordering and Mutation Invariants
@@ -30,7 +29,8 @@ The ordered-object domain is defined by stable insertion order, explicit mutatio
 - `Set` appends a new key at the end.
 - `Set` updates an existing key in place without changing its position.
 - `Delete` removes the key and closes the gap in the ordered sequence.
-- `Keys`, `Values`, `Entries`, and `ForEach` observe the current insertion order.
+- `All` lazily observes the current insertion order and supports early stop.
+- Mutating an object during `All` iteration is unsupported; use `Entries` when mutation isolation is required.
 - `Keys`, `Values`, and `Entries` return new slices; mutating those returned slices must not mutate the object.
 - `Clone` is shallow: it copies the entries slice, not the values stored inside it.
 - Empty-string keys are valid.
@@ -41,23 +41,20 @@ The ordered-object domain is defined by stable insertion order, explicit mutatio
 ## Map Conversion Rules
 
 - `FromSortedMap` creates deterministic lexical key order.
-- `FromUnorderedMap` inherits Go's map iteration order and is therefore non-deterministic.
 - `ToUnorderedMap` returns a new `map[string]V` and drops ordering semantics.
 
 ## JSON Rules
 
-- `FromJSON` and `UnmarshalJSONFrom` accept only JSON objects.
-- Non-object input must fail with an error that wraps `ErrExpectedObjectStart`.
-- Non-string member names must fail with an error that wraps `ErrExpectedStringKey`.
-- Duplicate member names must fail with an error that wraps `ErrDuplicateKey`.
-- Trailing tokens after `UnmarshalJSON` must fail with an error that wraps `ErrTrailingToken`.
-- Nil JSON encoders and decoders must fail with errors that wrap `ErrNilJSONEncoder` and `ErrNilJSONDecoder`.
+- `FromJSON` and `UnmarshalJSON` accept only JSON objects.
+- Non-object input must fail with `*json.UnmarshalTypeError`.
+- Malformed JSON and trailing input must retain standard `encoding/json` errors.
+- Duplicate member names at the current `Object` level must fail with an error
+  that wraps `ErrDuplicateKey`; nested values retain `encoding/json` semantics.
 - JSON decode replacement is transactional: failed decode leaves existing entries unchanged.
 - Successful JSON decode replaces the receiver.
 - `MarshalJSON` returns compact JSON bytes without a trailing stream newline.
-- `MarshalJSONTo` emits members in insertion order and follows the provided encoder's output behavior.
 - Plain map values are encoded with deterministic key ordering.
-- Values implementing `OrderedMarshaler` are responsible for their own nested ordered encoding.
+- Nested values follow `encoding/json` method dispatch.
 
 > **Why:** Ordered behavior must stay explicit at the API boundary. Callers should know exactly which operations preserve order, which ones discard it, and which errors represent structural JSON violations.
 >
@@ -69,7 +66,8 @@ The ordered-object domain is defined by stable insertion order, explicit mutatio
   Keep replacement semantics position-stable.
 - Do not alias the internal entries slice through exported APIs.
   Return copies for snapshot-style accessors.
-- Do not silently accept non-object JSON, duplicate keys, or trailing input.
+- Do not silently accept non-object JSON, duplicate keys at the current
+  `Object` level, or trailing input.
   Return structural errors instead.
 - Do not add duplicate public names for the same JSON byte operation.
   `MarshalJSON` is the direct byte API.
@@ -77,5 +75,5 @@ The ordered-object domain is defined by stable insertion order, explicit mutatio
 ## Acceptance Criteria
 
 - Public APIs preserve the stated ordering and copy semantics.
-- JSON decoding errors continue to distinguish object-start, string-key, duplicate-key, trailing-token, and nil-stream violations.
+- JSON decoding keeps `ErrDuplicateKey` as the package-owned classification and preserves standard syntax/type errors for other failures.
 - Order-dropping operations are visible at the call site.

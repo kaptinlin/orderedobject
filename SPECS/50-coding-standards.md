@@ -8,10 +8,10 @@ This repository favors small, explicit Go code and lightweight tooling. Standard
 
 - The package targets the Go version declared in `go.mod`.
 - Prefer standard-library building blocks unless a dependency directly supports the package's ordered-JSON contract.
-- `github.com/go-json-experiment/json` is the runtime JSON dependency.
+- `encoding/json` is the runtime JSON dependency.
 - `github.com/google/go-cmp/cmp` is acceptable in tests for structural diffs.
 
-> **Why:** The package is small enough that each dependency should justify itself clearly. `go-json-experiment/json` provides the token-level APIs the package is built around, and `go-cmp` keeps test failures readable without introducing an assertion framework.
+> **Why:** The package is small enough that each dependency should justify itself clearly. The standard library covers the ordered byte boundary, and `go-cmp` keeps test failures readable without introducing an assertion framework.
 >
 > **Rejected:** Heavy test DSLs, convenience dependencies that do not strengthen the ordered-object contract, and duplicated design guidance outside `SPECS/`.
 
@@ -23,13 +23,19 @@ This repository favors small, explicit Go code and lightweight tooling. Standard
 - Do not add assertion frameworks.
 - Test user-visible behavior and public contracts, not copies of spec prose.
 - Do not add spec mirror tests when stronger behavior tests already prove the invariant.
+- Model fuzzers must assert their complete final state for every input, including
+  inputs that contain no complete operation.
 - When benchmarks are added, use `testing.B.Loop()`.
-- The package gate is `task test`, which runs `go test -race ./...`.
+- `task test` runs `go test -race -count=1 ./...`.
+- `task fuzz` runs bounded operation-model and JSON-transaction fuzz targets.
 
 ## Lint and Documentation Rules
 
 - `task lint` must pass before shipping changes.
-- `task lint` includes golangci-lint and a `go mod tidy` diff check.
+- `task lint` includes golangci-lint, a `go mod tidy` diff check, and a check-only
+  Go formatting pass.
+- `task verify` is the final check-only gate and runs vet, lint, tests,
+  vulnerability scanning, and bounded fuzzing without rewriting source files.
 - `SPECS/**` is canonical design documentation and must stay markdownlint-clean.
 - `README.md` is usage-oriented, and `CLAUDE.md` is agent-oriented.
 - Do not create policy-only gate scripts whose only job is to restate `SPECS/`, `README.md`, or `CLAUDE.md`.
@@ -43,6 +49,6 @@ This repository favors small, explicit Go code and lightweight tooling. Standard
 
 ## Acceptance Criteria
 
-- `task lint` and `task test` pass.
+- `task verify` passes without rewriting tracked source files.
 - New tests follow the concurrency and comparison rules above.
 - Normative design guidance remains centralized in `SPECS/`.

@@ -6,9 +6,9 @@
 
 ## Scope
 
-- The package exposes one ordered container, `Object[V any]`, plus `Entry[V]` and `OrderedMarshaler`.
+- The package exposes one ordered container, `Object[V any]`, plus `Entry[V]`.
 - The package is optimized for small-to-medium JSON objects where explicit ordering matters more than constant-time lookup.
-- Map boundaries are explicit: sorted imports invent deterministic lexical order, unordered imports and exports drop ordering semantics.
+- Map boundaries are explicit: sorted imports invent deterministic lexical order, while exports drop ordering semantics.
 - Examples and README content are explanatory only; normative design rules live in `SPECS/`.
 
 > **Why:** Most callers need a small ordered-object type for payload shaping, config-like documents, and stable JSON output. Keeping the scope narrow preserves readability and avoids inventing a second collection framework.

@@ -2,13 +2,13 @@
 
 ## Overview
 
-`orderedobject` stays a single-package library with one core implementation file for ordered-object behavior. The architecture favors explicit slice operations and token-stream JSON encoding over caches, layers, or hidden state.
+`orderedobject` stays a single-package library with one core implementation file for ordered-object behavior. The architecture favors explicit slice operations and direct ordered JSON byte framing over caches, layers, or hidden state.
 
 ## Package Topology
 
 - Core ordered-object behavior lives in `object.go`.
-- Example programs may depend on the package, but the package must not depend on examples or tooling code.
-- Runtime JSON behavior depends on `github.com/go-json-experiment/json` and `jsontext`.
+- Executable package examples live in `example_test.go` and add no runtime dependency.
+- Runtime JSON behavior depends only on the standard `encoding/json` package.
 
 > **Why:** The package solves one narrow problem. Keeping the implementation local and visible makes the behavior easy to audit and reduces maintenance overhead.
 >
@@ -25,16 +25,13 @@
 
 ## JSON Pipeline
 
-- Ordered marshal paths write JSON through `jsontext.Encoder`.
-- The encoder writes object delimiters and string keys as tokens, then delegates value encoding.
-- `MarshalJSON` uses the token-stream path and returns compact bytes without the encoder's top-level stream newline.
-- `MarshalJSONTo` writes directly to the provided encoder and keeps that encoder's formatting and stream behavior.
-- Nested `OrderedMarshaler` values bypass the generic value encoder so they can preserve their own order.
-- Non-ordered map values are encoded with `json.Deterministic(true)` to stabilize nested map output.
-- Unmarshal paths read from `jsontext.Decoder` and decode each member value directly into `V`.
+- `MarshalJSON` writes object delimiters in `entries` order and delegates every key and value to `encoding/json`.
+- Nested ordered objects use the standard `json.Marshaler` contract; plain maps inherit deterministic standard-library key ordering.
+- `UnmarshalJSON` validates one complete JSON value, then uses `json.Decoder` tokens to read top-level members in source order.
+- Decode builds local entries and commits only after the complete object succeeds.
 - The package must not round-trip through an intermediate `map[string]V` during ordered JSON encoding or decoding.
 
-> **Why:** Token-stream encoding preserves order directly and avoids rebuilding objects through unordered intermediates.
+> **Why:** Direct byte framing preserves encode order without an intermediate map, while decoder tokens recover top-level source order without building a general JSON DOM.
 >
 > **Rejected:** Map-based round-trips, parallel index structures, and architecture that optimizes hypothetical throughput at the cost of a harder-to-reason-about implementation.
 
@@ -48,7 +45,5 @@
 ## Acceptance Criteria
 
 - The canonical storage model remains slice-backed.
-- Ordered JSON paths remain token-stream based.
+- Ordered JSON paths remain direct and avoid unordered map round-trips.
 - Architecture changes keep ordered behavior auditable from one primary implementation area.
-
-**Origin:** Migrated from `CLAUDE.md` on 2026-04-21.

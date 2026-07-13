@@ -25,6 +25,28 @@ vars:
       {{.GOLANGCI_LINT_BINARY}} version --format short 2>/dev/null ||
       {{.GOLANGCI_LINT_BINARY}} version --short 2>/dev/null ||
       echo "not-installed"
+  GOVULNCHECK_LOCAL_BINARY: '{{.GOBIN}}/govulncheck'
+  REQUIRED_GOVULNCHECK_VERSION:
+    sh: cat .govulncheck.version
+  GOVULNCHECK_BINARY:
+    sh: |
+      required="$(cat .govulncheck.version)"
+      for candidate in "$(command -v govulncheck 2>/dev/null || true)" "{{.GOVULNCHECK_LOCAL_BINARY}}"; do
+        [ -n "$candidate" ] || continue
+        [ -x "$candidate" ] || continue
+        version="$("$candidate" -version 2>/dev/null | awk '/^Scanner:/ {sub(/^govulncheck@v/, "", $2); print $2}')"
+        if [ "$version" = "$required" ]; then
+          echo "$candidate"
+          exit 0
+        fi
+      done
+      echo "{{.GOVULNCHECK_LOCAL_BINARY}}"
+  GOVULNCHECK_VERSION:
+    sh: |
+      {{.GOVULNCHECK_BINARY}} -version 2>/dev/null |
+      awk '/^Scanner:/ {sub(/^govulncheck@v/, "", $2); print $2}' ||
+      echo "not-installed"
+  FUZZ_TIME: 10s
 
 env:
   GOBIN: '{{.GOBIN}}'
@@ -101,13 +123,14 @@ tasks:
     desc: Run all tests with race detection
     cmds:
       - echo "Running all tests..."
-      - go test -race ./...
+      - go test -race -count=1 ./...
 
   lint:
     desc: Run all linters
-    deps:
-      - golangci-lint
-      - tidy-lint
+    cmds:
+      - task: tidy-lint
+      - task: fmt-check
+      - task: golangci-lint
 
   install-golangci-lint:
     desc: Install golangci-lint with the required version
@@ -135,13 +158,18 @@ tasks:
   tidy-lint:
     desc: Check if go.mod and go.sum are tidy
     cmds:
+      - echo "Checking go.mod and go.sum are tidy..."
+      - go mod tidy -diff
+
+  fmt-check:
+    desc: Check Go formatting without modifying files
+    cmds:
       - |
-        echo "Checking go.mod and go.sum are tidy..."
-        before="$(git diff -- go.mod go.sum)"
-        go mod tidy
-        after="$(git diff -- go.mod go.sum)"
-        if [ "$before" != "$after" ]; then
-          git diff -- go.mod go.sum
+        echo "Checking Go formatting..."
+        files="$(find . -path './.*' -prune -o -path './vendor' -prune -o \
+          -type f -name '*.go' -exec gofmt -l {} +)"
+        if [ -n "$files" ]; then
+          echo "$files"
           exit 1
         fi
 
@@ -152,8 +180,28 @@ tasks:
 
   vuln:
     desc: Run govulncheck
+    deps:
+      - install-govulncheck
     cmds:
-      - govulncheck ./...
+      - '{{.GOVULNCHECK_BINARY}} ./...'
+
+  install-govulncheck:
+    desc: Install govulncheck with the required version
+    cmds:
+      - mkdir -p "{{.GOBIN}}"
+      - |
+        if [ "{{.GOVULNCHECK_VERSION}}" != "{{.REQUIRED_GOVULNCHECK_VERSION}}" ]; then
+          echo "Installing govulncheck v{{.REQUIRED_GOVULNCHECK_VERSION}}..."
+          GOBIN="{{.GOBIN}}" go install golang.org/x/vuln/cmd/govulncheck@v{{.REQUIRED_GOVULNCHECK_VERSION}}
+        fi
+    status:
+      - test "{{.GOVULNCHECK_VERSION}}" = "{{.REQUIRED_GOVULNCHECK_VERSION}}"
+
+  fuzz:
+    desc: Run bounded fuzz targets
+    cmds:
+      - go test -run '^$' -fuzz '^FuzzObjectOperations$' -fuzztime={{.FUZZ_TIME}} .
+      - go test -run '^$' -fuzz '^FuzzObjectJSON$' -fuzztime={{.FUZZ_TIME}} .
 
   fmt:
     desc: Format Go code
@@ -170,12 +218,11 @@ tasks:
       - go vet ./...
 
   verify:
-    desc: Run all verification steps (deps, format, vet, lint, test, vuln)
+    desc: Run all check-only verification steps
     cmds:
-      - task: deps
-      - task: fmt
       - task: vet
       - task: lint
       - task: test
       - task: vuln
-      - echo "All verification steps completed successfully ✅"
+      - task: fuzz
+      - echo "All verification steps completed successfully"

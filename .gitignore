@@ -34,6 +34,9 @@ bin/
 # Local build folder
 build/
 
+# Local code analysis indexes
+.codegraph/
+
 # Mac OS files
 **/.DS_Store
 

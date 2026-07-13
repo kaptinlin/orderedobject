@@ -32,6 +32,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Install Task
         uses: go-task/setup-task@v2
@@ -41,6 +42,9 @@ jobs:
 
       - name: Run tests
         run: task test
+
+      - name: Run vet
+        run: task vet
 
   lint:
     name: Lint
@@ -59,6 +63,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Install Task
         uses: go-task/setup-task@v2
@@ -68,6 +73,9 @@ jobs:
 
       - name: Check module graph is tidy
         run: task tidy-lint
+
+      - name: Check formatting
+        run: task fmt-check
 
       - name: Read golangci-lint version
         id: golangci
@@ -92,8 +100,37 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run govulncheck
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+        run: task vuln
+
+  fuzz:
+    name: Fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run bounded fuzz targets
+        run: task fuzz

@@ -9,23 +9,30 @@ For usage and runnable examples, see [README.md](README.md). `AGENTS.md` is a sy
 ## Commands
 
 ```bash
-task test  # Run go test -race ./...
-task lint  # Run golangci-lint and the go mod tidy check
-task fmt   # Run Go formatting
-task vet   # Run go vet ./...
-task clean # Remove build artifacts and Go caches
+task test   # Run go test -race -count=1 ./...
+task lint   # Check module tidiness, formatting, and golangci-lint
+task fuzz   # Run both fuzz targets for a bounded 10 seconds each
+task verify # Run the complete check-only gate
+task fmt    # Run Go formatting
+task vet    # Run go vet ./...
+task clean  # Remove build artifacts and Go caches
 ```
 
 ## Architecture
 
 - `object.go` — ordered object implementation and JSON encode/decode paths
 - `object_test.go` — unit, round-trip, and benchmark coverage
-- `examples/` — runnable usage examples
+- `object_fuzz_test.go` — operation-sequence model fuzzing
+- `json_fuzz_test.go` — JSON transaction and round-trip fuzzing
+- `example_test.go` — executable canonical usage examples
 - `SPECS/` — canonical design rules
+- `.references/` — reference implementations used as evidence, not conformance targets
 - `Taskfile.yml` — developer commands
-- `.github/workflows/ci.yml` — CI gates for test, lint, and security checks
+- `.github/workflows/ci.yml` — CI gates for test, lint, security, and fuzz checks
 
-Runtime JSON behavior depends on `github.com/go-json-experiment/json` and `jsontext`.
+`MarshalJSON` frames members directly in insertion order and delegates keys and
+values to `encoding/json`. `UnmarshalJSON` uses decoder tokens only to recover
+top-level source order before committing a complete replacement.
 
 ## Agent Operating Rules
 
@@ -48,8 +55,15 @@ Before changing behavior, tests, or docs, read the relevant `SPECS/` files first
 
 1. Identify the relevant specs from the index below.
 2. Read those specs completely.
-3. Design the change within the existing slice-backed, token-stream model.
+3. Design the change within the slice-backed model and direct ordered JSON byte boundary.
 4. If a requested change conflicts with a spec, ask the user before proceeding.
+
+### Implementation Phase — Read References as Evidence
+
+Before implementation, inspect at least two relevant projects under
+`.references/`. Borrow only proof shapes or lessons that match current local
+pressure; do not copy their API, storage model, dependencies, or compatibility
+constraints without local evidence.
 
 ## SPECS Index
 
@@ -59,6 +73,14 @@ Before changing behavior, tests, or docs, read the relevant `SPECS/` files first
 | `SPECS/10-domain-specs.md` | Public types, constructors, mutation invariants, map conversion rules, and JSON semantics |
 | `SPECS/40-architecture-specs.md` | Storage model and JSON pipeline |
 | `SPECS/50-coding-standards.md` | Testing, linting, and documentation rules |
+
+## References Index
+
+| Path | Relevant evidence |
+| --- | --- |
+| `.references/orderedmap/` | Explicit ordered traversal and copy behavior |
+| `.references/go-ordered-map/` | Ordered JSON byte framing, examples, and bounded fuzzing |
+| `.references/go-json-experiment-json/` | JSON dispatch and stream encoder semantics used for comparison only |
 
 ## Design Philosophy
 
@@ -70,8 +92,8 @@ Before changing behavior, tests, or docs, read the relevant `SPECS/` files first
 
 ## API Design Principles
 
-- **Progressive Disclosure**: `New`, `NewCap`, `FromEntries`, map imports, and `FromJSON` cover construction, while `MarshalJSONTo` and `UnmarshalJSONFrom` remain available for token-stream control.
-- **Explicit boundaries**: Sorted map import invents deterministic order; unordered map import and export drop ordering semantics.
+- **Progressive Disclosure**: `New`, `NewCap`, `FromEntries`, `FromSortedMap`, and `FromJSON` cover construction without duplicate paths.
+- **Explicit boundaries**: Sorted map import invents deterministic order; map export explicitly drops ordering semantics.
 - **Single path**: Do not add aliases or wrappers that duplicate an existing public operation.
 
 ## Coding Rules
@@ -82,7 +104,7 @@ Before changing behavior, tests, or docs, read the relevant `SPECS/` files first
 - Read the relevant `SPECS/` documents before changing behavior or docs.
 - Use `t.Parallel()` when a test case is safe to run concurrently.
 - Use focused subtests and `cmp.Diff` for structural comparisons.
-- Keep ordered JSON paths token-stream based and avoid unordered map round-trips.
+- Frame ordered JSON directly, use decoder tokens only for top-level source order, and avoid unordered map round-trips.
 
 ### Forbidden
 
@@ -95,8 +117,10 @@ Before changing behavior, tests, or docs, read the relevant `SPECS/` files first
 
 ## Testing
 
-- `task test` is the main gate and runs `go test -race ./...`.
-- `task lint` runs golangci-lint plus a tidy check.
+- `task test` runs `go test -race -count=1 ./...`.
+- `task lint` checks module tidiness, Go formatting, and golangci-lint.
+- `task fuzz` runs the operation and JSON fuzz targets for bounded durations.
+- `task verify` is the final check-only gate and adds vet and vulnerability scanning.
 - Benchmarks use `testing.B.Loop()`.
 - Test error contracts with `errors.Is`.
 
@@ -112,4 +136,16 @@ When you hit a bug or limitation in a dependency:
 
 ## Agent Skills
 
-Repo-local skills live under `.agents/skills/`. Use the smallest relevant skill for the task, especially documentation, pruning, testing, linting, and Go API design skills.
+Repo-local skills live under `.agents/skills/`; `.claude/skills` points to the
+same directory. Use the smallest relevant skill.
+
+| Skill | Use when |
+| --- | --- |
+| `tdd-implementing` | Implementing behavior through RED/GREEN/refactor |
+| `library-test-covering` | Expanding behavior, error, fuzz, or regression coverage |
+| `agent-md-writing` | Updating `CLAUDE.md` / `AGENTS.md` |
+| `readme-writing` | Updating user-facing usage documentation |
+| `spec-writing` | Updating durable contracts under `SPECS/` |
+| `code-review` | Reviewing the complete implementation diff before commit |
+| `committing` | Staging and creating the verified commit |
+| `releasing` | Selecting, tagging, publishing, and verifying a release |

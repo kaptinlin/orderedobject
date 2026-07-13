@@ -4,39 +4,20 @@ package orderedobject
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"iter"
 	"maps"
 	"reflect"
 	"slices"
-
-	json "github.com/go-json-experiment/json"
-	"github.com/go-json-experiment/json/jsontext"
 )
 
 var (
-	// ErrExpectedObjectStart is returned when the next JSON token is not '{'.
-	ErrExpectedObjectStart = errors.New("expected object start")
-	// ErrExpectedStringKey is returned when the next JSON token is not a string key.
-	ErrExpectedStringKey = errors.New("expected string key")
 	// ErrDuplicateKey is returned when JSON or entry input contains a repeated key.
 	ErrDuplicateKey = errors.New("duplicate key")
-	// ErrTrailingToken is returned when JSON input contains data after the top-level object.
-	ErrTrailingToken = errors.New("trailing token")
-	// ErrNilJSONEncoder is returned when JSON encoding is asked to use a nil encoder.
-	ErrNilJSONEncoder = errors.New("nil JSON encoder")
-	// ErrNilJSONDecoder is returned when JSON decoding is asked to use a nil decoder.
-	ErrNilJSONDecoder = errors.New("nil JSON decoder")
-
-	errNilObject = errors.New("nil object")
+	errNilObject    = errors.New("nil object")
 )
-
-// OrderedMarshaler marshals a value to JSON while preserving key order.
-type OrderedMarshaler interface {
-	// MarshalJSONTo writes the JSON encoding of the value to enc.
-	MarshalJSONTo(enc *jsontext.Encoder) error
-}
 
 // Entry holds one key-value pair in an Object.
 type Entry[V any] struct {
@@ -81,15 +62,6 @@ func FromSortedMap[V any](m map[string]V) *Object[V] {
 	obj := NewCap[V](len(m))
 	for _, key := range slices.Sorted(maps.Keys(m)) {
 		obj.entries = append(obj.entries, Entry[V]{Key: key, Value: m[key]})
-	}
-	return obj
-}
-
-// FromUnorderedMap returns an Object containing entries from m in Go map iteration order.
-func FromUnorderedMap[V any](m map[string]V) *Object[V] {
-	obj := NewCap[V](len(m))
-	for k, v := range m {
-		obj.entries = append(obj.entries, Entry[V]{Key: k, Value: v})
 	}
 	return obj
 }
@@ -192,13 +164,18 @@ func (o *Object[V]) Entries() []Entry[V] {
 	return slices.Clone(o.entries)
 }
 
-// ForEach calls fn for each entry in insertion order.
-func (o *Object[V]) ForEach(fn func(key string, value V)) {
-	if o == nil {
-		return
-	}
-	for _, entry := range slices.Clone(o.entries) {
-		fn(entry.Key, entry.Value)
+// All returns an iterator over entries in insertion order.
+// Mutating o during iteration is unsupported; use Entries for a snapshot.
+func (o *Object[V]) All() iter.Seq2[string, V] {
+	return func(yield func(string, V) bool) {
+		if o == nil {
+			return
+		}
+		for i := range o.entries {
+			if !yield(o.entries[i].Key, o.entries[i].Value) {
+				return
+			}
+		}
 	}
 }
 
@@ -212,49 +189,33 @@ func (o *Object[V]) Clone() *Object[V] {
 
 // MarshalJSON returns the JSON encoding of o.
 func (o *Object[V]) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	enc := jsontext.NewEncoder(&buf)
-	if err := o.MarshalJSONTo(enc); err != nil {
-		return nil, err
-	}
-	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
-}
-
-// MarshalJSONTo writes the JSON encoding of o to enc.
-// Nested map values are encoded with deterministic key order.
-func (o *Object[V]) MarshalJSONTo(enc *jsontext.Encoder) error {
-	if enc == nil {
-		return ErrNilJSONEncoder
-	}
 	if o == nil {
-		return enc.WriteToken(jsontext.Null)
+		return []byte("null"), nil
 	}
-	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
-		return err
-	}
+
+	var buf bytes.Buffer
+	buf.WriteByte('{')
 	for i := range o.entries {
-		entry := &o.entries[i]
-		if err := enc.WriteToken(jsontext.String(entry.Key)); err != nil {
-			return err
+		if i > 0 {
+			buf.WriteByte(',')
 		}
 
-		if marshaler, ok := any(entry.Value).(OrderedMarshaler); ok {
-			if isNilOrderedMarshaler(marshaler) {
-				if err := enc.WriteToken(jsontext.Null); err != nil {
-					return err
-				}
-				continue
-			}
-			if err := marshaler.MarshalJSONTo(enc); err != nil {
-				return fmt.Errorf("marshal ordered value for key %q: %w", entry.Key, err)
-			}
-			continue
+		entry := &o.entries[i]
+		key, err := json.Marshal(entry.Key)
+		if err != nil {
+			return nil, fmt.Errorf("marshal key %q: %w", entry.Key, err)
 		}
-		if err := json.MarshalEncode(enc, entry.Value, json.Deterministic(true)); err != nil {
-			return fmt.Errorf("marshal value for key %q: %w", entry.Key, err)
+		buf.Write(key)
+		buf.WriteByte(':')
+
+		value, err := json.Marshal(entry.Value)
+		if err != nil {
+			return nil, fmt.Errorf("marshal value for key %q: %w", entry.Key, err)
 		}
+		buf.Write(value)
 	}
-	return enc.WriteToken(jsontext.EndObject)
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 // UnmarshalJSON decodes a JSON object into o.
@@ -262,44 +223,18 @@ func (o *Object[V]) UnmarshalJSON(data []byte) error {
 	if o == nil {
 		return errNilObject
 	}
-	dec := jsontext.NewDecoder(bytes.NewReader(data), jsontext.AllowDuplicateNames(true))
-	entries, err := decodeEntries[V](dec)
-	if err != nil {
+
+	var raw json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	tok, err := dec.ReadToken()
-	switch {
-	case errors.Is(err, io.EOF):
-		o.replaceEntries(entries)
-		return nil
-	case err != nil:
-		return fmt.Errorf("invalid trailing content: %w", errors.Join(ErrTrailingToken, err))
-	default:
-		return fmt.Errorf("unexpected trailing token %v: %w", tok.Kind(), ErrTrailingToken)
-	}
-}
-
-func isNilOrderedMarshaler(marshaler OrderedMarshaler) bool {
-	v := reflect.ValueOf(marshaler)
-	return v.Kind() == reflect.Pointer && v.IsNil()
-}
-
-func readObjectKey(dec *jsontext.Decoder) (string, error) {
-	kind := dec.PeekKind()
-	if kind == 0 {
-		_, err := dec.ReadToken()
-		return "", err
-	}
-	if kind != jsontext.KindString {
-		return "", fmt.Errorf("expected string key, got %v: %w", kind, ErrExpectedStringKey)
-	}
-
-	tok, err := dec.ReadToken()
+	entries, err := decodeEntries[V](raw)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return tok.String(), nil
+	o.replaceEntries(entries)
+	return nil
 }
 
 func findEntryIndex[V any](entries []Entry[V], key string) int {
@@ -315,24 +250,28 @@ func duplicateKeyError(key string) error {
 	return fmt.Errorf("duplicate key %q: %w", key, ErrDuplicateKey)
 }
 
-func decodeEntries[V any](dec *jsontext.Decoder) ([]Entry[V], error) {
-	if dec == nil {
-		return nil, ErrNilJSONDecoder
-	}
-
-	tok, err := dec.ReadToken()
+func decodeEntries[V any](data []byte) ([]Entry[V], error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	tok, err := dec.Token()
 	if err != nil {
 		return nil, err
 	}
-	if tok.Kind() != jsontext.KindBeginObject {
-		return nil, fmt.Errorf("expected object start '{', got %v: %w", tok.Kind(), ErrExpectedObjectStart)
+	if tok != json.Delim('{') {
+		return nil, &json.UnmarshalTypeError{
+			Value: jsonTokenType(tok),
+			Type:  reflect.TypeFor[Object[V]](),
+		}
 	}
 
 	entries := make([]Entry[V], 0)
-	for dec.PeekKind() != jsontext.KindEndObject {
-		key, err := readObjectKey(dec)
+	for dec.More() {
+		keyToken, err := dec.Token()
 		if err != nil {
 			return nil, err
+		}
+		key, ok := keyToken.(string)
+		if !ok {
+			return nil, fmt.Errorf("decode object key: expected string, got %T", keyToken)
 		}
 
 		if findEntryIndex(entries, key) >= 0 {
@@ -340,36 +279,43 @@ func decodeEntries[V any](dec *jsontext.Decoder) ([]Entry[V], error) {
 		}
 
 		var value V
-		if err := json.UnmarshalDecode(dec, &value); err != nil {
+		if err := dec.Decode(&value); err != nil {
 			return nil, fmt.Errorf("decode value for key %q: %w", key, err)
 		}
 
 		entries = append(entries, Entry[V]{Key: key, Value: value})
 	}
 
-	if _, err = dec.ReadToken(); err != nil {
+	if _, err = dec.Token(); err != nil {
 		return nil, err
 	}
 	return entries, nil
 }
 
+func jsonTokenType(tok json.Token) string {
+	switch tok := tok.(type) {
+	case nil:
+		return "null"
+	case bool:
+		return "bool"
+	case float64, json.Number:
+		return "number"
+	case string:
+		return "string"
+	case json.Delim:
+		switch tok {
+		case '[':
+			return "array"
+		case '{':
+			return "object"
+		}
+	}
+	return fmt.Sprintf("%v", tok)
+}
+
 func (o *Object[V]) replaceEntries(entries []Entry[V]) {
 	clear(o.entries)
 	o.entries = entries
-}
-
-// UnmarshalJSONFrom decodes a JSON object from dec into o.
-// UnmarshalJSONFrom replaces any existing entries in o only after a successful decode.
-func (o *Object[V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	if o == nil {
-		return errNilObject
-	}
-	entries, err := decodeEntries[V](dec)
-	if err != nil {
-		return err
-	}
-	o.replaceEntries(entries)
-	return nil
 }
 
 // ToUnorderedMap returns a new map containing o's entries.
